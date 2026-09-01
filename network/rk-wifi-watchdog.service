@@ -1,0 +1,7 @@
+[Unit]
+Description=Check RK Cloud Wi-Fi and tunnel services
+After=NetworkManager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/rk-wifi-watchdog

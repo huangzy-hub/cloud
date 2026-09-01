@@ -1,0 +1,11 @@
+{
+  // Headscale usernames without an @ are referenced as "username@".
+  // This permits only devices owned by the cloud user to reach one another.
+  "grants": [
+    {
+      "src": ["cloud@"],
+      "dst": ["cloud@"],
+      "ip": ["*"],
+    },
+  ],
+}

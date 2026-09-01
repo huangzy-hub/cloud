@@ -1,0 +1,12 @@
+serverAddr = "203.0.113.10"
+serverPort = 10925
+loginFailExit = false
+auth.method = "token"
+auth.token = "__FRP_TOKEN__"
+
+[[proxies]]
+name = "rk-cloud-web"
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = 18080
+remotePort = 18082

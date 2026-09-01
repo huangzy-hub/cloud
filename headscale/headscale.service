@@ -1,0 +1,25 @@
+[Unit]
+Description=Headscale coordination server for Tailscale
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=headscale
+Group=headscale
+WorkingDirectory=/var/lib/headscale
+ExecStart=/usr/bin/headscale serve --config /etc/headscale/config.yaml
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=5
+RuntimeDirectory=headscale
+RuntimeDirectoryMode=0750
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/headscale /run/headscale
+
+[Install]
+WantedBy=multi-user.target

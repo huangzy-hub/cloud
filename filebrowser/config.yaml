@@ -1,0 +1,84 @@
+server:
+  port: 18082
+  listen: "127.0.0.1"
+  baseURL: "/"
+  database: "/var/lib/filebrowser-quantum/database.db"
+  cacheDir: "/srv/cloud/SSD/.rk-cloud-cache"
+  externalUrl: "https://cloud.example.com"
+  disableWebDAV: true
+  filesystem:
+    createFilePermission: "660"
+    createDirectoryPermission: "770"
+  logging:
+    - levels: "info|warning|error"
+      output: "stdout"
+      noColors: true
+  sources:
+    - path: "/srv/cloud/SSD"
+      name: "SSD"
+      config:
+        defaultEnabled: true
+        defaultUserScope: "/"
+        private: true
+        readOnly: false
+        rules:
+          - ignoreSymlinks: true
+          - folderName: ".rk-cloud-cache"
+          - folderName: "lost+found"
+          - fileName: ".resized"
+    - path: "/srv/cloud/USB"
+      name: "USB"
+      config:
+        defaultEnabled: true
+        defaultUserScope: "/"
+        private: true
+        readOnly: false
+        rules:
+          - ignoreSymlinks: true
+          - folderName: "lost+found"
+          - fileName: ".resized"
+
+http:
+  trustedHeaders:
+    - X-Forwarded-Proto
+    - X-Forwarded-Host
+    - X-Forwarded-For
+    - X-Real-IP
+
+auth:
+  tokenExpirationHours: 12
+  adminUsername: "__web_admin_disabled__"
+  methods:
+    password:
+      enabled: false
+    proxy:
+      enabled: true
+      header: "X-Forwarded-User"
+      createUser: true
+      logoutRedirectUrl: "https://cloud.example.com/logout"
+
+userDefaults:
+  ui:
+    darkMode: true
+  listing:
+    singleClick: false
+  account:
+    disableSettings: true
+    loginMethod: "proxy"
+    lockPassword: true
+    disableUpdateNotifications: true
+    permissions:
+      admin: false
+      modify: true
+      share: false
+      api: false
+      download: true
+      create: true
+      delete: true
+      realtime: false
+
+frontend:
+  name: "RK 私有云盘"
+  disableDefaultLinks: true
+  disableUsedPercentage: false
+  description: "SSD 与 U 盘的私有文件空间"

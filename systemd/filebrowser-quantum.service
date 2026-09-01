@@ -1,0 +1,24 @@
+[Unit]
+Description=FileBrowser Quantum for RK Cloud
+After=network.target
+RequiresMountsFor=/srv/cloud/SSD /srv/cloud/USB
+
+[Service]
+Type=simple
+User=cloud
+Group=cloud
+UMask=0007
+ExecStartPre=/usr/bin/mountpoint --quiet /srv/cloud/SSD
+ExecStartPre=/usr/bin/mountpoint --quiet /srv/cloud/USB
+ExecStart=/usr/local/bin/filebrowser-quantum -c /etc/filebrowser-quantum/config.yaml
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/cloud /var/lib/filebrowser-quantum /var/cache/filebrowser-quantum
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target

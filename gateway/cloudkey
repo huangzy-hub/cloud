@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+
+if [ "$(id -u)" -ne 0 ]; then
+  echo "cloudkey must be run as root" >&2
+  exit 1
+fi
+
+exec runuser -u cloud -- \
+  /usr/local/lib/rk-cloud/cloud_auth.py \
+  --state-dir /etc/cloud-auth "$@"

@@ -1,0 +1,8 @@
+bindAddr = "0.0.0.0"
+bindPort = 10925
+
+# Remote proxy ports bind only to loopback, so Nginx is the sole public entry point.
+proxyBindAddr = "127.0.0.1"
+
+auth.method = "token"
+auth.token = "REPLACE_WITH_A_LONG_RANDOM_TOKEN"

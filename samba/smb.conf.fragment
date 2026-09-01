@@ -1,0 +1,16 @@
+[global]
+    interfaces = lo
+    bind interfaces only = yes
+    smb ports = 445
+    map to guest = never
+
+[RKCloud]
+    path = /srv/cloud
+    browseable = yes
+    read only = no
+    valid users = cloud
+    force user = cloud
+    create mask = 0660
+    force create mode = 0660
+    directory mask = 0770
+    force directory mode = 0770
