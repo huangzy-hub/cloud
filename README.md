@@ -13,7 +13,8 @@
 
 ```text
 Windows 网络驱动器
-  Windows -> Tailscale/Headscale -> Tailscale Serve -> Samba -> /srv/cloud
+  Windows -> Tailscale/Headscale -> Tailscale Serve -> Samba
+          -> Z: /srv/cloud/SSD, Y: /srv/cloud/USB
 
 公网 Web
   Browser -> HTTPS/Nginx -> FRP -> RK Nginx -> cloud-auth
@@ -24,7 +25,7 @@ Windows 网络驱动器
 
 ## 功能
 
-- SSD、U 盘独立挂载，任一设备故障不影响另一个设备的文件系统。
+- SSD、U 盘独立挂载，并分别映射为 Windows `Z:`、`Y:`，容量显示与物理盘一致。
 - Windows SMB 端口只在 RK 回环地址监听，再由 Tailscale Serve 暴露到 Tailnet。
 - 公网只开放 HTTPS；FRP 的 Web 出口在服务器上仅绑定 `127.0.0.1`。
 - 自定义单 Key 登录，支持创建、过期、撤销、轮换和全局会话失效。

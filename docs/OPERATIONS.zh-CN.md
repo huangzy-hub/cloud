@@ -9,8 +9,8 @@
 - 公网入口：`https://cloud.example.com/`
 - Headscale 控制端：`https://headscale.example.com/`
 - RK 的 Tailscale 地址：`<RK_TAILSCALE_IP>`（用 `tailscale ip -4` 查询）
-- Windows 网络驱动器：`Z:`
-- Samba 共享：`RKCloud`
+- Windows 网络驱动器：`Z:`（SSD）、`Y:`（U 盘）
+- Samba 共享：`RKSSD`、`RKUSB`
 - Samba 用户：`cloud`
 - SSD：`/dev/nvme0n1p1`，挂载到 `/srv/cloud/SSD`，约 116 GB 可用
 - U 盘：`/dev/sda1`，挂载到 `/srv/cloud/USB`，约 58 GB 可用
@@ -29,8 +29,9 @@
 ## 2. 整体结构
 
 ```text
-Windows Z:
-  Windows -> Tailscale/Headscale -> RK Tailscale Serve -> Samba -> /srv/cloud
+Windows Z:/Y:
+  Windows -> Tailscale/Headscale -> RK Tailscale Serve -> Samba
+          -> /srv/cloud/SSD 和 /srv/cloud/USB
 
 公网网页：
   浏览器 -> HTTPS cloud.example.com -> 公网服务器 Nginx
@@ -63,33 +64,35 @@ Web 和 `Z:` 看到的是同一份文件，因此：
 
 重要文件在删除前应先复制到另一台设备或独立备份介质。
 
-## 4. 从 Windows 的 Z 盘访问
+## 4. 从 Windows 的 Z、Y 盘访问
 
-Windows 已通过 Headscale 管理的 Tailscale 网络连接到 RK。正常情况下，资源管理器中的 `Z:` 包含：
+Windows 已通过 Headscale 管理的 Tailscale 网络连接到 RK。正常情况下：
 
 ```text
-Z:\SSD
-Z:\USB
+Z:\  -> SSD
+Y:\  -> U 盘
 ```
 
 查看当前映射：
 
 ```powershell
 net use
-Get-PSDrive Z
+Get-PSDrive Z,Y
 ```
 
 验证两个存储入口：
 
 ```powershell
-Get-Item Z:\SSD, Z:\USB
+Get-Item Z:\, Y:\
 ```
 
 如果需要重新映射，先确认 Tailscale 已连接，然后执行：
 
 ```powershell
 net use Z: /delete
-net use Z: \\<RK_TAILSCALE_IP>\RKCloud /user:cloud * /persistent:yes
+net use Y: /delete
+net use Z: \\<RK_TAILSCALE_IP>\RKSSD /user:cloud * /persistent:yes
+net use Y: \\<RK_TAILSCALE_IP>\RKUSB /user:cloud * /persistent:yes
 ```
 
 命令中的 `*` 会让 Windows 交互式询问 Samba 密码，避免把密码留在命令历史中。
@@ -104,9 +107,9 @@ Test-NetConnection <RK_TAILSCALE_IP> -Port 445
 
 SMB 服务本身只监听 RK 的回环地址 `127.0.0.1:445`，由 Tailscale Serve 将 Tailnet 内的 `<RK_TAILSCALE_IP>:445` 转发到 Samba。因此校园网和公网不能直接访问 445 端口。
 
-### Z 盘容量显示说明
+### Z、Y 盘容量显示说明
 
-`Z:` 是一个共享根目录，下面包含两个独立文件系统。Windows 可能把共享根目录容量显示为 RK 系统盘容量，而不是 SSD 与 U 盘容量之和。这不表示数据写入了 eMMC。
+`Z:` 和 `Y:` 分别直接共享两个挂载点，因此 Windows 会分别显示 SSD 与 U 盘容量。旧的 `RKCloud` 共享以 `/srv/cloud` 为根，会错误显示 RK eMMC 容量，现已不再使用。
 
 以 RK 上的以下命令为准：
 
@@ -417,7 +420,7 @@ cloudkey rotate owner
 systemctl restart cloud-auth
 ```
 
-### Z 盘断开
+### Z 或 Y 盘断开
 
 依次检查：
 

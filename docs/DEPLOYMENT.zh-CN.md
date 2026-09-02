@@ -10,7 +10,7 @@
                     -> 单 Key 鉴权 -> FileBrowser -> SSD/USB
 ```
 
-公网服务器只负责 Headscale 控制、TLS 终止和流量转发，不保存云盘文件。SSD 与 U 盘是两个独立文件系统；Samba 把共同父目录共享为一个 `Z:` 盘，FileBrowser 把它们显示为两个 source，从而分别报告容量。
+公网服务器只负责 Headscale 控制、TLS 终止和流量转发，不保存云盘文件。SSD 与 U 盘是两个独立文件系统；Samba 将它们分别共享为 Windows `Z:`、`Y:`，FileBrowser 也显示为两个 source，因此两端都能报告各自容量。
 
 ## 1. 部署前准备
 
@@ -247,7 +247,7 @@ ping <RK_TAILSCALE_IP>
 
 Tailscale 会优先尝试 NAT 穿透形成点对点 WireGuard 链路；校园网限制较严时会退回 DERP 中继，只要控制端、DERP 和 HTTPS 可达仍可连接。`tailscale status` 或 `tailscale ping <目标>` 可查看是 `direct` 还是 `relay`。
 
-## 6. 部署 Samba 并挂载 Z 盘
+## 6. 部署 Samba 并挂载 Z、Y 盘
 
 在 RK 安装 Samba：
 
@@ -274,14 +274,16 @@ tailscale serve --bg --tcp=445 tcp://127.0.0.1:445
 tailscale serve status
 ```
 
-在 Windows 管理员 PowerShell 中挂载网络驱动器：
+在 Windows 管理员 PowerShell 中分别挂载两个网络驱动器：
 
 ```powershell
 net use Z: /delete /y
-net use Z: "\\<RK_TAILSCALE_IP>\RKCloud" /user:cloud * /persistent:yes
+net use Y: /delete /y
+net use Z: "\\<RK_TAILSCALE_IP>\RKSSD" /user:cloud * /persistent:yes
+net use Y: "\\<RK_TAILSCALE_IP>\RKUSB" /user:cloud * /persistent:yes
 ```
 
-星号会让 Windows 安全地交互输入 Samba 密码。不要把密码写入 `.bat`、PowerShell 历史或 Git。`Z:\SSD` 和 `Z:\USB` 分别是两块物理盘。
+第一次命令中的星号会让 Windows 安全地交互输入 Samba 密码；第二次通常会复用同一服务器凭据。不要把密码写入 `.bat`、PowerShell 历史或 Git。`Z:` 是 SSD，`Y:` 是 U 盘，Windows 显示的容量会分别对应两个真实文件系统。
 
 ## 7. 在 RK 部署 FileBrowser Quantum
 
@@ -585,7 +587,7 @@ journalctl -u cloud-auth -n 100 --no-pager
 
 Key 可能已过期、被撤销或已轮换。不要尝试读取旧明文；用 `cloudkey rotate <name>` 生成替代 Key。
 
-### Z 盘断开
+### Z 或 Y 盘断开
 
 ```powershell
 & "$env:ProgramFiles\Tailscale\tailscale.exe" status
