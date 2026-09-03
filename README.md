@@ -14,18 +14,18 @@
 ```text
 Windows 网络驱动器
   Windows -> Tailscale/Headscale -> Tailscale Serve -> Samba
-          -> Z: /srv/cloud/SSD, Y: /srv/cloud/USB
+          -> Z: /srv/cloud/SSD, Y: /srv/cloud/USB, X: /srv/cloud/USB2
 
 公网 Web
   Browser -> HTTPS/Nginx -> FRP -> RK Nginx -> cloud-auth
           -> FileBrowser Quantum -> /srv/cloud/{SSD,USB}
 ```
 
-网页中将 SSD 和 U 盘配置成两个独立 source，因此可以分别显示两个文件系统的容量占用。
+网页中将 SSD 和两块 U 盘配置成三个独立 source，因此可以分别显示三个文件系统的容量占用。
 
 ## 功能
 
-- SSD、U 盘独立挂载，并分别映射为 Windows `Z:`、`Y:`，容量显示与物理盘一致。
+- SSD、两块 U 盘独立挂载，并分别映射为 Windows `Z:`、`Y:`、`X:`，容量显示与物理盘一致。
 - Windows SMB 端口只在 RK 回环地址监听，再由 Tailscale Serve 暴露到 Tailnet。
 - 公网只开放 HTTPS；FRP 的 Web 出口在服务器上仅绑定 `127.0.0.1`。
 - 自定义单 Key 登录，支持创建、过期、撤销、轮换和全局会话失效。
@@ -85,6 +85,7 @@ tail.example.com        -> Tailnet MagicDNS 域
 203.0.113.10            -> 公网服务器 IP
 <SSD_UUID>              -> SSD 文件系统 UUID
 <USB_UUID>              -> U 盘文件系统 UUID
+<USB2_UUID>             -> 第二块 U 盘文件系统 UUID
 ```
 
 FRP token、Samba 密码、访问 Key 和 SSH 私钥不得提交到 Git。完整步骤见部署指南。

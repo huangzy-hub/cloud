@@ -118,6 +118,18 @@ UUID=<SSD_UUID> /srv/cloud/SSD ext4 defaults,noatime,nofail,x-systemd.device-tim
 UUID=<USB_UUID> /srv/cloud/USB ext4 defaults,noatime,nofail,x-systemd.device-timeout=10s 0 2
 ```
 
+如需加入第二块保持 exFAT 格式的 U 盘，可单独创建安全挂载点。先用 `id cloud` 查出实际 UID/GID，再替换下例中的数值：
+
+```sh
+install -d -m 0000 -o root -g root /srv/cloud/USB2
+echo 'UUID=<USB2_UUID> /srv/cloud/USB2 exfat defaults,noatime,nosuid,nodev,nofail,x-systemd.automount,x-systemd.device-timeout=10s,uid=<CLOUD_UID>,gid=<CLOUD_GID>,fmask=0007,dmask=0007 0 0' >> /etc/fstab
+systemctl daemon-reload
+mount /srv/cloud/USB2
+findmnt /srv/cloud/USB2
+```
+
+未挂载时将目录权限保持为 `0000`，可以防止 FileBrowser 或 Samba 意外把 USB2 文件写进 eMMC。exFAT 不保存 Linux 属主和权限，所以通过挂载参数将所有文件映射给 `cloud` 用户。
+
 挂载并设置根目录权限：
 
 ```sh
@@ -279,11 +291,13 @@ tailscale serve status
 ```powershell
 net use Z: /delete /y
 net use Y: /delete /y
+net use X: /delete /y
 net use Z: "\\<RK_TAILSCALE_IP>\RKSSD" /user:cloud * /persistent:yes
 net use Y: "\\<RK_TAILSCALE_IP>\RKUSB" /user:cloud * /persistent:yes
+net use X: "\\<RK_TAILSCALE_IP>\RKUSB2" /user:cloud * /persistent:yes
 ```
 
-第一次命令中的星号会让 Windows 安全地交互输入 Samba 密码；第二次通常会复用同一服务器凭据。不要把密码写入 `.bat`、PowerShell 历史或 Git。`Z:` 是 SSD，`Y:` 是 U 盘，Windows 显示的容量会分别对应两个真实文件系统。
+第一次命令中的星号会让 Windows 安全地交互输入 Samba 密码；后续命令通常会复用同一服务器凭据。不要把密码写入 `.bat`、PowerShell 历史或 Git。`Z:` 是 SSD，`Y:`、`X:` 是两块 U 盘，Windows 显示的容量会分别对应三个真实文件系统。
 
 ## 7. 在 RK 部署 FileBrowser Quantum
 
@@ -314,7 +328,7 @@ systemctl status --no-pager filebrowser-quantum
 curl -I http://127.0.0.1:18082/
 ```
 
-这里不能把 `/srv/cloud` 配成一个 source：它只是 eMMC 上的父目录，内部跨越两个挂载点，容量会被识别成父文件系统容量。把 `/srv/cloud/SSD` 和 `/srv/cloud/USB` 配成两个 source 后，FileBrowser 才能分别读取正确的文件系统统计。`frontend.disableUsedPercentage: false` 会显示占用条。
+这里不能把 `/srv/cloud` 配成一个 source：它只是 eMMC 上的父目录，内部跨越多个挂载点，容量会被识别成父文件系统容量。把 `/srv/cloud/SSD`、`/srv/cloud/USB` 和 `/srv/cloud/USB2` 配成独立 source 后，FileBrowser 才能分别读取正确的文件系统统计。`frontend.disableUsedPercentage: false` 会显示占用条。
 
 FileBrowser 使用 `X-Forwarded-User` 代理认证。它必须只监听 `127.0.0.1`，否则攻击者可自行伪造这个头绕过登录。
 

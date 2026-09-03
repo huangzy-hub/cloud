@@ -10,10 +10,11 @@
 - Headscale 控制端：`https://headscale.example.com/`
 - RK 的 Tailscale 地址：`<RK_TAILSCALE_IP>`（用 `tailscale ip -4` 查询）
 - Windows 网络驱动器：`Z:`（SSD）、`Y:`（U 盘）
-- Samba 共享：`RKSSD`、`RKUSB`
+- Samba 共享：`RKSSD`、`RKUSB`、`RKUSB2`
 - Samba 用户：`cloud`
 - SSD：`/dev/nvme0n1p1`，挂载到 `/srv/cloud/SSD`，约 116 GB 可用
 - U 盘：`/dev/sda1`，挂载到 `/srv/cloud/USB`，约 58 GB 可用
+- 第二块 U 盘：按 UUID 挂载到 `/srv/cloud/USB2`，当前为 exFAT
 - Web 和 `Z:` 操作的是同一份文件，不存在额外同步副本
 
 截至本文最后核对时，SSD 和 U 盘的用户可见内容均为空。网页中只显示 `SSD` 和 `USB` 两个存储入口。
@@ -91,8 +92,10 @@ Get-Item Z:\, Y:\
 ```powershell
 net use Z: /delete
 net use Y: /delete
+net use X: /delete
 net use Z: \\<RK_TAILSCALE_IP>\RKSSD /user:cloud * /persistent:yes
 net use Y: \\<RK_TAILSCALE_IP>\RKUSB /user:cloud * /persistent:yes
+net use X: \\<RK_TAILSCALE_IP>\RKUSB2 /user:cloud * /persistent:yes
 ```
 
 命令中的 `*` 会让 Windows 交互式询问 Samba 密码，避免把密码留在命令历史中。

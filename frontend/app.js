@@ -4,6 +4,7 @@
   const SOURCES = {
     SSD: { title: "本地磁盘 (SSD)", short: "SSD" },
     USB: { title: "可移动磁盘 (USB)", short: "USB" },
+    USB2: { title: "可移动磁盘 (USB2)", short: "USB2" },
   };
   const CHUNK_SIZE = 10 * 1024 * 1024;
   const state = {

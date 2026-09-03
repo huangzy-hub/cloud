@@ -37,6 +37,17 @@ server:
           - ignoreSymlinks: true
           - folderName: "lost+found"
           - fileName: ".resized"
+    - path: "/srv/cloud/USB2"
+      name: "USB2"
+      config:
+        defaultEnabled: true
+        defaultUserScope: "/"
+        private: true
+        readOnly: false
+        rules:
+          - ignoreSymlinks: true
+          - folderName: "lost+found"
+          - fileName: ".resized"
 
 http:
   trustedHeaders:
@@ -81,4 +92,4 @@ frontend:
   name: "RK 私有云盘"
   disableDefaultLinks: true
   disableUsedPercentage: false
-  description: "SSD 与 U 盘的私有文件空间"
+  description: "SSD 与两块 U 盘的私有文件空间"
