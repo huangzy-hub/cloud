@@ -31,6 +31,7 @@ Windows 网络驱动器
 - 自定义单 Key 登录，支持创建、过期、撤销、轮换和全局会话失效。
 - Key 只保存 scrypt 散列，明文只在创建或轮换时显示一次。
 - FileBrowser Quantum 使用反向代理认证，无公开后台管理入口。
+- 自带仿 Windows 文件资源管理器网页：首页、地址栏、磁盘容量、详细列表与常用文件操作。
 - systemd 自动启动和重连；可选 NetworkManager 网络看门狗。
 - 包含单元测试、HTTP 集成测试和公网 SSD/USB CRUD 测试。
 
@@ -47,6 +48,7 @@ Windows 网络驱动器
 ```text
 config/        RK 部署变量示例
 filebrowser/   FileBrowser Quantum 配置
+frontend/      仿 Windows 文件资源管理器网页
 frp/           FRP 客户端配置模板
 gateway/       单 Key 认证服务
 headscale/     Headscale 示例配置与 systemd 服务

@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f5f7fb">
+  <title>RK Cloud 文件资源管理器</title>
+  <link rel="stylesheet" href="/explorer/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="titlebar">
+      <div class="app-title">
+        <span class="app-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <span>RK Cloud 文件资源管理器</span>
+      </div>
+      <div class="window-controls" aria-hidden="true">
+        <span>—</span><span>□</span><span>×</span>
+      </div>
+    </header>
+
+    <section class="nav-row" aria-label="导航">
+      <button class="icon-button" id="backButton" title="后退" aria-label="后退">←</button>
+      <button class="icon-button" id="forwardButton" title="前进" aria-label="前进">→</button>
+      <button class="icon-button" id="upButton" title="上一级" aria-label="上一级">↑</button>
+      <button class="icon-button" id="refreshButton" title="刷新" aria-label="刷新">↻</button>
+      <div class="address-bar" id="breadcrumbs" aria-label="地址栏"></div>
+      <label class="search-box">
+        <span aria-hidden="true">⌕</span>
+        <input id="searchInput" type="search" placeholder="在此电脑中搜索" autocomplete="off">
+      </label>
+    </section>
+
+    <section class="command-bar" aria-label="文件操作">
+      <button id="newFolderButton"><span class="command-icon">＋</span>新建文件夹</button>
+      <span class="separator"></span>
+      <button id="uploadButton"><span class="command-icon">⇧</span>上传</button>
+      <input id="fileInput" type="file" multiple hidden>
+      <button id="downloadButton" disabled><span class="command-icon">⇩</span>下载</button>
+      <button id="renameButton" disabled><span class="command-icon">✎</span>重命名</button>
+      <button id="deleteButton" disabled><span class="command-icon">⌫</span>删除</button>
+      <span class="command-spacer"></span>
+      <button id="viewButton"><span class="command-icon">☷</span>详细信息</button>
+      <a class="command-link" id="classicLink" href="/files/SSD/" title="使用 FileBrowser 原界面">经典界面</a>
+      <a class="command-link logout" href="/logout">退出</a>
+    </section>
+
+    <div class="workspace">
+      <aside class="sidebar" aria-label="侧边栏">
+        <nav>
+          <button class="side-item active" data-target="home">
+            <span class="side-icon home-icon">⌂</span><span>主页</span>
+          </button>
+          <div class="side-heading">位置</div>
+          <button class="side-item" data-source="SSD" data-path="/">
+            <span class="side-icon pc-icon">▰</span><span>此电脑</span>
+          </button>
+          <button class="side-item nested" data-source="SSD" data-path="/">
+            <span class="side-icon drive-icon">▱</span><span>本地磁盘 (SSD)</span>
+          </button>
+          <button class="side-item nested" data-source="USB" data-path="/">
+            <span class="side-icon usb-icon">♆</span><span>可移动磁盘 (USB)</span>
+          </button>
+          <div class="side-heading">网络</div>
+          <button class="side-item" id="networkItem">
+            <span class="side-icon network-icon">◎</span><span>RK3576 Cloud</span>
+          </button>
+        </nav>
+        <div class="connection-state"><span id="connectionDot"></span><span id="connectionText">正在连接…</span></div>
+      </aside>
+
+      <main class="content" id="content" tabindex="-1">
+        <section id="homeView">
+          <div class="welcome-row">
+            <div>
+              <p class="eyebrow">RK3576 私有存储</p>
+              <h1>主页</h1>
+              <p class="subtle">像使用电脑磁盘一样管理 SSD 和 U 盘中的文件。</p>
+            </div>
+            <div class="device-status"><span class="status-pulse"></span>设备在线</div>
+          </div>
+
+          <h2 class="section-title"><span class="chevron">⌄</span>设备和驱动器</h2>
+          <div class="drive-grid" id="driveGrid">
+            <button class="drive-card" data-source="SSD">
+              <span class="drive-illustration"><span class="drive-led"></span></span>
+              <span class="drive-detail">
+                <strong>本地磁盘 (SSD)</strong>
+                <span class="capacity-track"><i></i></span>
+                <span class="capacity-label">正在读取容量…</span>
+              </span>
+            </button>
+            <button class="drive-card" data-source="USB">
+              <span class="drive-illustration removable"><span class="drive-led"></span></span>
+              <span class="drive-detail">
+                <strong>可移动磁盘 (USB)</strong>
+                <span class="capacity-track"><i></i></span>
+                <span class="capacity-label">正在读取容量…</span>
+              </span>
+            </button>
+          </div>
+
+          <h2 class="section-title recent-title"><span class="chevron">⌄</span>快速访问</h2>
+          <div class="quick-grid">
+            <button data-source="SSD" data-path="/BaiduNetdiskDownload/" class="quick-card"><span>📥</span><b>百度网盘下载</b><small>SSD</small></button>
+            <button data-source="SSD" data-path="/Downloads/" class="quick-card"><span>⇩</span><b>下载</b><small>SSD</small></button>
+            <button data-source="USB" data-path="/" class="quick-card"><span>♆</span><b>U 盘</b><small>USB</small></button>
+          </div>
+        </section>
+
+        <section id="filesView" hidden>
+          <div class="folder-heading">
+            <div>
+              <p class="eyebrow" id="sourceLabel">SSD</p>
+              <h1 id="folderTitle">本地磁盘 (SSD)</h1>
+            </div>
+            <div class="folder-meta" id="folderMeta">正在加载…</div>
+          </div>
+          <div class="file-table-wrap" id="dropZone">
+            <table class="file-table">
+              <thead><tr><th class="name-column" data-sort="name">名称 <span>⌃</span></th><th data-sort="modified">修改日期</th><th data-sort="type">类型</th><th data-sort="size">大小</th></tr></thead>
+              <tbody id="fileList"></tbody>
+            </table>
+            <div class="empty-state" id="emptyState" hidden>
+              <div class="empty-folder">⌑</div><strong>此文件夹为空</strong><span>可将文件拖到此处上传</span>
+            </div>
+            <div class="loading-state" id="loadingState"><span class="spinner"></span>正在加载文件…</div>
+            <div class="drop-overlay" id="dropOverlay"><div>⇧</div><strong>释放以上传到当前文件夹</strong></div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <footer class="statusbar">
+      <span id="statusText">正在连接到 RK Cloud…</span>
+      <span class="status-right"><span id="selectionText"></span><span class="zoom-control">− <i></i> ＋</span></span>
+    </footer>
+  </div>
+
+  <div class="toast-stack" id="toastStack" aria-live="polite"></div>
+
+  <dialog id="promptDialog">
+    <form method="dialog" id="promptForm">
+      <h2 id="promptTitle">输入名称</h2>
+      <p id="promptDescription"></p>
+      <input id="promptInput" autocomplete="off" required>
+      <div class="dialog-actions"><button value="cancel" class="secondary">取消</button><button value="confirm" id="promptConfirm">确定</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="confirmDialog">
+    <form method="dialog">
+      <div class="warning-icon">!</div>
+      <div><h2 id="confirmTitle">删除文件</h2><p id="confirmDescription">此操作无法撤销。</p></div>
+      <div class="dialog-actions full"><button value="cancel" class="secondary">取消</button><button value="confirm" class="danger">删除</button></div>
+    </form>
+  </dialog>
+
+  <section class="transfer-panel" id="transferPanel" hidden>
+    <div class="transfer-heading"><strong>上传任务</strong><button id="closeTransfers" aria-label="关闭">×</button></div>
+    <div id="transferList"></div>
+  </section>
+
+  <script src="/explorer/app.js" defer></script>
+</body>
+</html>

@@ -318,6 +318,28 @@ curl -I http://127.0.0.1:18082/
 
 FileBrowser 使用 `X-Forwarded-User` 代理认证。它必须只监听 `127.0.0.1`，否则攻击者可自行伪造这个头绕过登录。
 
+### 安装资源管理器风格网页
+
+仓库的 `frontend/` 是一个不依赖 Node.js 构建环境的静态前端。它通过 FileBrowser Quantum 的同源 API 读取真实目录和容量，并提供目录浏览、搜索、上传、下载、新建文件夹、重命名和删除。FileBrowser 原界面仍保留在 `/files/SSD/`、`/files/USB/`，可通过页面右上角“经典界面”进入。
+
+```sh
+install -d -m 0755 /usr/local/share/rk-cloud/explorer
+install -m 0644 frontend/index.html frontend/styles.css frontend/app.js \
+  /usr/local/share/rk-cloud/explorer/
+```
+
+静态页面本身不保存 Key，也不能绕过鉴权。Nginx 对 `/explorer/` 执行与 FileBrowser 相同的 `auth_request`，浏览器登录后才会收到页面文件；API 请求继续由 Nginx 注入可信的 `X-Forwarded-User`。
+
+也可以将这三个静态文件安装到公网服务器的站点目录：
+
+```sh
+install -d -m 0755 /www/wwwroot/cloud.example.com/explorer
+install -m 0644 frontend/index.html frontend/styles.css frontend/app.js \
+  /www/wwwroot/cloud.example.com/explorer/
+```
+
+仓库的 `server/cloud.https.conf.example` 已包含对应的静态路由。此布局下，静态外壳由公网服务器直接返回，但目录、容量及全部文件操作仍通过 FRP 到 RK；未登录的 API 请求仍会被 RK 重定向到 Key 登录页，因此静态服务器接触不到文件内容。
+
 ## 8. 部署单 Key 鉴权与 RK Nginx
 
 安装 Python 服务和管理命令：
@@ -352,6 +374,13 @@ systemctl daemon-reload
 systemctl enable --now cloud-auth filebrowser-quantum nginx
 curl -fsS http://127.0.0.1:18081/healthz
 curl -I http://127.0.0.1:18080/login
+```
+
+部署完成后，访问域名根路径会跳转到 `/explorer/`。验证静态页面和旧界面都可访问：
+
+```sh
+curl -I http://127.0.0.1:18080/explorer/
+curl -I http://127.0.0.1:18080/files/SSD/
 ```
 
 认证过程是：RK Nginx 先用 `auth_request` 询问 `cloud-auth`；成功后只取回内部用户名，再由 Nginx 写入 `X-Forwarded-User` 交给 FileBrowser。浏览器不能直接提供这个用户名。

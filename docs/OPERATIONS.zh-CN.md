@@ -504,6 +504,7 @@ D:\root\cloud
 ```text
 gateway/       单 Key 鉴权服务
 filebrowser/   FileBrowser Quantum 配置
+frontend/      仿 Windows 文件资源管理器网页
 nginx/         RK Nginx 配置
 frp/           FRP 客户端模板
 systemd/       RK 服务单元
