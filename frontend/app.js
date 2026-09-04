@@ -32,7 +32,7 @@
     delete: $("#deleteButton"), upload: $("#uploadButton"), newFolder: $("#newFolderButton"),
     fileInput: $("#fileInput"), dropZone: $("#dropZone"), transferPanel: $("#transferPanel"),
     transferList: $("#transferList"), promptDialog: $("#promptDialog"),
-    confirmDialog: $("#confirmDialog"), content: $("#content"), classicLink: $("#classicLink"),
+    confirmDialog: $("#confirmDialog"), content: $("#content"),
   };
 
   function apiUrl(endpoint, params = {}) {
@@ -186,11 +186,10 @@
     elements.homeView.hidden = false;
     elements.filesView.hidden = true;
     elements.search.placeholder = "在此电脑中搜索";
-    elements.classicLink.href = "/files/SSD/";
     updateSelection();
     renderBreadcrumbs();
     activateSidebar("home", "/");
-    elements.status.textContent = "2 个驱动器";
+    elements.status.textContent = "3 个驱动器";
     if (push) pushHistory({ view: "home" });
     loadCapacities();
   }
@@ -210,7 +209,6 @@
     elements.folderTitle.textContent = state.path === "/" ? SOURCES[source].title : decodeURIComponent(state.path.split("/").filter(Boolean).at(-1));
     elements.folderMeta.textContent = "正在加载…";
     elements.search.placeholder = `在 ${elements.folderTitle.textContent} 中搜索`;
-    elements.classicLink.href = `/files/${encodeURIComponent(source)}${state.path.split("/").map(encodeURIComponent).join("/")}`;
     renderBreadcrumbs();
     activateSidebar(source, state.path);
     updateSelection();
@@ -259,7 +257,7 @@
       return `<tr data-name="${escapeHtml(entry.name)}" class="${selected ? "selected" : ""}">
         <td><div class="name-cell"><span class="file-icon ${info.iconClass}">${escapeHtml(info.badge)}</span><span class="file-name">${escapeHtml(entry.name)}</span></div></td>
         <td>${escapeHtml(formatDate(entry.modified))}</td><td>${escapeHtml(info.label)}</td>
-        <td>${entryIsDirectory(entry) ? "" : escapeHtml(formatBytes(entry.size))}</td></tr>`;
+        <td>${entry.size === undefined || entry.size === null ? "正在计算…" : escapeHtml(formatBytes(entry.size))}</td></tr>`;
     }).join("");
 
     elements.empty.hidden = state.loading || entries.length > 0;
@@ -291,7 +289,7 @@
     elements.newFolder.disabled = state.view !== "files";
     elements.upload.disabled = state.view !== "files";
     elements.up.disabled = state.view === "home";
-    elements.selection.textContent = has ? `已选择 1 个项目  ${entryIsDirectory(state.selected) ? "" : formatBytes(state.selected.size)}` : "";
+    elements.selection.textContent = has ? `已选择 1 个项目  ${formatBytes(state.selected.size)}` : "";
   }
 
   function openEntry(name) {
@@ -303,12 +301,9 @@
 
   function downloadEntry(entry = state.selected) {
     if (!entry) return;
-    if (entryIsDirectory(entry)) {
-      location.href = `/files/${encodeURIComponent(state.source)}${entryPath(entry).split("/").map(encodeURIComponent).join("/")}`;
-      toast("文件夹打包下载已在经典界面打开");
-      return;
-    }
-    location.href = apiUrl("resources/download", { source: state.source, file: entryPath(entry) });
+    const params = { source: state.source, file: entryPath(entry) };
+    if (entryIsDirectory(entry)) params.algo = "zip";
+    location.href = apiUrl("resources/download", params);
   }
 
   function renderBreadcrumbs() {

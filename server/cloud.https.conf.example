@@ -44,6 +44,14 @@ server {
         return 302 /explorer/;
     }
 
+    location = /files {
+        return 302 /explorer/;
+    }
+
+    location ^~ /files/ {
+        return 302 /explorer/;
+    }
+
     # The static shell can live on the public server. File data and every API
     # operation still pass through FRP to the RK and remain Key-protected there.
     location ^~ /explorer/ {

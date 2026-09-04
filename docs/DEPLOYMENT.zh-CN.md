@@ -1,23 +1,23 @@
 # RK3576 私有云盘完整部署指南
 
-本文从空白 Debian 主机开始，复现一套同时支持 Windows 网络驱动器和公网 Web 的私有云盘。示例环境是 RK3576（Debian 12 ARM64）、一块 NVMe SSD、一个 U 盘、一台 Debian 公网服务器和一台 Windows 电脑。
+本文从空白 Debian 主机开始，复现一套同时支持 Windows 网络驱动器和公网 Web 的私有云盘。示例环境是 RK3576（Debian 12 ARM64）、一块 NVMe SSD、两块 U 盘、一台 Debian 公网服务器和一台 Windows 电脑。
 
 最终有两条访问链路：
 
 ```text
-私有文件协议：Windows -> Tailscale/Headscale -> RK -> Samba -> SSD/USB
+私有文件协议：Windows -> Tailscale/Headscale -> RK -> Samba -> SSD/USB/USB2
 公网网页：浏览器 -> HTTPS -> 公网 Nginx -> FRP -> RK Nginx
-                    -> 单 Key 鉴权 -> FileBrowser -> SSD/USB
+                    -> 单 Key 鉴权 -> FileBrowser -> SSD/USB/USB2
 ```
 
-公网服务器只负责 Headscale 控制、TLS 终止和流量转发，不保存云盘文件。SSD 与 U 盘是两个独立文件系统；Samba 将它们分别共享为 Windows `Z:`、`Y:`，FileBrowser 也显示为两个 source，因此两端都能报告各自容量。
+公网服务器只负责 Headscale 控制、TLS 终止和流量转发，不保存云盘文件。SSD 与两块 U 盘是三个独立文件系统；Samba 将它们分别共享为 Windows `Z:`、`Y:`、`X:`，FileBrowser 也显示为三个 source，因此两端都能报告各自容量。
 
 ## 1. 部署前准备
 
 准备以下资源：
 
 - RK3576 或其他 ARM64 Linux 主机，建议 4 GB 以上内存；
-- 一块 SSD 和一个 U 盘；
+- 一块 SSD 和两块 U 盘；
 - 一台有公网 IPv4 的 Debian 12/Ubuntu 服务器；
 - 两个解析到公网服务器的域名；
 - Windows 10/11 客户端；
@@ -36,6 +36,7 @@
 | RK Tailscale IP | `<RK_TAILSCALE_IP>` |
 | SSD UUID | `<SSD_UUID>` |
 | U 盘 UUID | `<USB_UUID>` |
+| 第二块 U 盘 UUID | `<USB2_UUID>` |
 
 先克隆仓库：
 
@@ -139,7 +140,7 @@ chown cloud:cloud /srv/cloud/SSD /srv/cloud/USB
 chmod 0770 /srv/cloud/SSD /srv/cloud/USB
 findmnt /srv/cloud/SSD
 findmnt /srv/cloud/USB
-df -hT /srv/cloud/SSD /srv/cloud/USB
+df -hT /srv/cloud/SSD /srv/cloud/USB /srv/cloud/USB2
 ```
 
 Linux 看到块设备不等于可以直接放文件。挂载把文件系统的根目录接入系统目录树；不挂载时向 `/srv/cloud/SSD` 写入的数据会落到 eMMC 上的同名普通目录，所以每次开机都要检查 `findmnt`。
@@ -334,7 +335,7 @@ FileBrowser 使用 `X-Forwarded-User` 代理认证。它必须只监听 `127.0.0
 
 ### 安装资源管理器风格网页
 
-仓库的 `frontend/` 是一个不依赖 Node.js 构建环境的静态前端。它通过 FileBrowser Quantum 的同源 API 读取真实目录和容量，并提供目录浏览、搜索、上传、下载、新建文件夹、重命名和删除。FileBrowser 原界面仍保留在 `/files/SSD/`、`/files/USB/`，可通过页面右上角“经典界面”进入。
+仓库的 `frontend/` 是一个不依赖 Node.js 构建环境的静态前端。它通过 FileBrowser Quantum 的同源 API 读取真实目录、文件夹大小和磁盘容量，并提供目录浏览、搜索、上传、下载、新建文件夹、重命名和删除。文件夹下载由新界面直接请求 ZIP 压缩包，不依赖旧页面。旧 FileBrowser 页面不再公开，访问 `/files/` 会跳回 `/explorer/`；FileBrowser 后端仍作为内部文件 API 使用。
 
 ```sh
 install -d -m 0755 /usr/local/share/rk-cloud/explorer
@@ -390,12 +391,14 @@ curl -fsS http://127.0.0.1:18081/healthz
 curl -I http://127.0.0.1:18080/login
 ```
 
-部署完成后，访问域名根路径会跳转到 `/explorer/`。验证静态页面和旧界面都可访问：
+部署完成后，访问域名根路径会跳转到 `/explorer/`。验证静态页面可访问、旧界面路由已停用：
 
 ```sh
 curl -I http://127.0.0.1:18080/explorer/
 curl -I http://127.0.0.1:18080/files/SSD/
 ```
+
+两条命令都应返回重定向；第一条指向 `/login`（尚未登录时），第二条固定指向 `/explorer/`。
 
 认证过程是：RK Nginx 先用 `auth_request` 询问 `cloud-auth`；成功后只取回内部用户名，再由 Nginx 写入 `X-Forwarded-User` 交给 FileBrowser。浏览器不能直接提供这个用户名。
 
@@ -561,7 +564,7 @@ ss -lntp | grep -E ':(445|18080|18081|18082)\b'
 tailscale serve status
 ```
 
-预期：445、18080、18081、18082 都只监听回环；445 另由 Tailscale IP 提供；两个存储目录的 `SOURCE` 分别对应真实 SSD 和 U 盘。
+预期：445、18080、18081、18082 都只监听回环；445 另由 Tailscale IP 提供；三个存储目录的 `SOURCE` 分别对应真实 SSD 和两块 U 盘。
 
 ### 公网服务器检查
 
@@ -576,8 +579,8 @@ curl -I https://cloud.example.com/login
 
 1. 打开云盘 HTTPS 域名；
 2. 输入 `cloudkey add` 创建的 Key；
-3. 左侧应看到 `SSD` 和 `USB` 两个来源及各自容量；
-4. 分别在两个来源中新建、上传、重命名、下载和删除测试文件；
+3. 左侧应看到 `SSD`、`USB` 和 `USB2` 三个来源及各自容量；
+4. 分别在三个来源中新建、上传、重命名、下载和删除测试文件；
 5. 在 Windows `Z:` 盘确认能看到同一文件变化。
 
 也可在 Windows 使用仓库内的自动化脚本：
@@ -651,7 +654,7 @@ ss -lntp | grep ':445'
 
 ### 网页容量不显示或不正确
 
-确认配置中是 `/srv/cloud/SSD`、`/srv/cloud/USB` 两个独立 source，且：
+确认配置中是 `/srv/cloud/SSD`、`/srv/cloud/USB`、`/srv/cloud/USB2` 三个独立 source，且：
 
 ```yaml
 frontend:
@@ -664,7 +667,7 @@ frontend:
 systemctl restart filebrowser-quantum
 ```
 
-如果把父目录 `/srv/cloud` 当成单一 source，它无法代表两个挂载点的容量总和。
+如果把父目录 `/srv/cloud` 当成单一 source，它无法代表三个挂载点的容量总和。
 
 ## 14. 备份与升级
 

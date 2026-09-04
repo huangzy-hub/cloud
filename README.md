@@ -17,8 +17,8 @@ Windows 网络驱动器
           -> Z: /srv/cloud/SSD, Y: /srv/cloud/USB, X: /srv/cloud/USB2
 
 公网 Web
-  Browser -> HTTPS/Nginx -> FRP -> RK Nginx -> cloud-auth
-          -> FileBrowser Quantum -> /srv/cloud/{SSD,USB}
+Browser -> HTTPS/Nginx -> FRP -> RK Nginx -> cloud-auth
+          -> FileBrowser Quantum -> /srv/cloud/{SSD,USB,USB2}
 ```
 
 网页中将 SSD 和两块 U 盘配置成三个独立 source，因此可以分别显示三个文件系统的容量占用。
