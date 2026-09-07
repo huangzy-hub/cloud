@@ -299,20 +299,19 @@ class FailureLimiter:
 
 LOGIN_PAGE = """<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>RK 私有云盘</title><style>
-:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;
-font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;background:#0b1220;color:#e5edf8}
-.card{width:min(92vw,420px);padding:34px;border:1px solid #26364d;border-radius:18px;background:#111c2e;
-box-shadow:0 24px 70px #0008}h1{font-size:25px;margin:0 0 8px}p{color:#9eb0c8;margin:0 0 24px}
-label{display:block;font-size:14px;margin-bottom:8px}input{width:100%;padding:13px 14px;border:1px solid #344968;
-border-radius:10px;background:#0a1424;color:#fff;font:inherit;outline:none}input:focus{border-color:#4f9cff;box-shadow:0 0 0 3px #2581ff25}
-button{width:100%;margin-top:14px;padding:13px;border:0;border-radius:10px;background:#2879e8;color:#fff;font-weight:700;
-font-size:16px;cursor:pointer}.error{padding:10px 12px;margin:0 0 16px;border-radius:9px;background:#4b1f2a;color:#ffbdc8}
-.hint{font-size:12px;text-align:center;margin:16px 0 0;color:#73859d}</style></head><body><main class="card">
-<h1>RK 私有云盘</h1><p>输入访问 Key 后进入 SSD 与 U 盘。</p>{error}
-<form method="post" action="/login"><input type="hidden" name="next" value="{next}">
-<label for="key">访问 Key</label><input id="key" name="key" type="password" autocomplete="current-password" autofocus required>
-<button type="submit">进入云盘</button></form><p class="hint">请勿在公共设备上保存 Key</p></main></body></html>"""
+<title>登录 RK Cloud</title><style>
+:root{color-scheme:light;--accent:#0067c0;--border:#d8dde5;--text:#1b1b1b;--muted:#5f6368}*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;font-family:"Segoe UI Variable","Segoe UI","Microsoft YaHei UI",sans-serif;color:var(--text);background:radial-gradient(circle at 18% 4%,rgba(120,190,240,.28),transparent 34%),linear-gradient(145deg,#eaf3f9,#f4f5f8 52%,#e6edf4)}
+.window{width:min(94vw,780px);overflow:hidden;border:1px solid #cbd3da;border-radius:10px;background:rgba(250,252,254,.96);box-shadow:0 24px 70px rgba(20,36,58,.2)}
+.titlebar{height:40px;display:flex;align-items:center;padding:0 14px;border-bottom:1px solid #e4e9ee;background:#f2f6fa;font-size:12px;font-weight:600}
+.mark{width:18px;height:18px;margin-right:9px;display:grid;grid-template-columns:1fr 1fr;gap:1px}.mark i{background:#1683d8}.controls{margin-left:auto;display:flex;gap:28px;color:#59636b;font-size:14px}
+.toolbar{height:50px;display:flex;align-items:center;gap:9px;padding:8px 14px;border-bottom:1px solid #e2e7eb;background:#f8fafc}.back{font-size:20px;color:#5d6871}.address{flex:1;height:33px;display:flex;align-items:center;padding:0 12px;border:1px solid #d5dbe2;border-radius:6px;background:#fff;color:#52606a;font-size:12px}.lock{margin-right:8px;color:#237a42}
+.main{display:grid;grid-template-columns:1.05fr .95fr;min-height:390px}.intro{padding:58px 48px;background:linear-gradient(145deg,rgba(235,246,253,.88),rgba(255,255,255,.5));border-right:1px solid #e1e6ea}.disk{position:relative;width:82px;height:53px;margin-bottom:30px;border-radius:6px 6px 9px 9px;background:linear-gradient(#eef2f5 0 51%,#aeb8c1 52% 73%,#75838e 74%);box-shadow:inset 0 0 0 1px #9da8b2,0 8px 16px rgba(29,52,69,.16)}.disk:before{content:"";position:absolute;top:-11px;left:10px;right:10px;height:15px;border:1px solid #adb8c0;border-bottom:0;border-radius:5px 5px 0 0;background:#e5ebef}.disk:after{content:"";position:absolute;right:9px;bottom:9px;width:6px;height:6px;border-radius:50%;background:#39c24f;box-shadow:0 0 5px #42dd59}
+.eyebrow{margin:0 0 10px;color:var(--accent);font-size:11px;font-weight:700;letter-spacing:1.2px}.intro h1{margin:0 0 13px;font-size:30px;font-weight:600}.intro p{margin:0;max-width:320px;color:var(--muted);font-size:14px;line-height:1.7}
+.panel{align-self:center;padding:42px 44px}.panel h2{margin:0 0 8px;font-size:22px;font-weight:600}.lead{margin:0 0 26px;color:var(--muted);font-size:13px;line-height:1.6}label{display:block;margin-bottom:8px;font-size:13px;font-weight:600}input{width:100%;height:42px;padding:0 12px;border:1px solid #9da8b2;border-radius:5px;background:#fff;color:var(--text);font:inherit;outline:none}input:focus{border-color:#4b96cc;box-shadow:inset 0 -2px var(--accent)}button{width:100%;height:42px;margin-top:14px;border:0;border-radius:5px;background:var(--accent);color:#fff;font:inherit;font-weight:600;cursor:pointer}button:hover{background:#075b9f}.error{margin:0 0 16px;padding:10px 12px;border-left:4px solid #c42b1c;border-radius:4px;background:#fdebea;color:#8d2118;font-size:13px}.hint{margin:15px 0 0;text-align:center;color:#76818a;font-size:11px}
+@media(max-width:680px){body{padding:12px}.main{display:block}.intro{min-height:0;padding:30px 28px;border:0;border-bottom:1px solid #e1e6ea}.disk{display:none}.intro h1{font-size:24px}.panel{padding:30px 28px}.controls{display:none}}
+@media(prefers-color-scheme:dark){:root{color-scheme:dark;--text:#f1f3f5;--muted:#b3bbc1;--border:#3b4349}body{background:#1c2227}.window{border-color:#46515a;background:#20262b}.titlebar,.toolbar{border-color:#343b40;background:#252d33}.address,input{border-color:#4a555d;background:#30383e;color:#eef2f5}.main{background:#20262b}.intro{border-color:#3b4349;background:linear-gradient(145deg,#263640,#20262b)}.error{background:#4b1f2a;color:#ffbdc8}.controls{color:#c4cbd0}}
+</style></head><body><main class="window"><header class="titlebar"><span class="mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>RK Cloud 文件资源管理器<span class="controls" aria-hidden="true"><span>—</span><span>□</span><span>×</span></span></header><div class="toolbar"><span class="back">←</span><div class="address"><span class="lock">●</span>RK Cloud / 安全登录</div></div><div class="main"><section class="intro"><div class="disk" aria-hidden="true"></div><p class="eyebrow">RK3576 私有存储</p><h1>访问 SSD 云盘</h1><p>登录后直接进入 SSD 文件目录。文件始终保存在你的 RK3576 上，公网服务器仅负责安全转发。</p></section><section class="panel"><h2>输入访问 Key</h2><p class="lead">使用管理员为你创建的有效 Key 继续访问。</p>{error}<form method="post" action="/login"><input type="hidden" name="next" value="{next}"><label for="key">访问 Key</label><input id="key" name="key" type="password" autocomplete="current-password" autofocus required><button type="submit">进入 SSD</button></form><p class="hint">请勿在公共设备上保存或分享 Key</p></section></div></main></body></html>"""
 
 
 def build_login_page(next_path: str, error: str = "") -> bytes:

@@ -48,21 +48,9 @@
     <div class="workspace">
       <aside class="sidebar" aria-label="侧边栏">
         <nav>
-          <button class="side-item active" data-target="home">
-            <span class="side-icon home-icon">⌂</span><span>主页</span>
-          </button>
           <div class="side-heading">位置</div>
-          <button class="side-item" data-source="SSD" data-path="/">
-            <span class="side-icon pc-icon">▰</span><span>此电脑</span>
-          </button>
-          <button class="side-item nested" data-source="SSD" data-path="/">
+          <button class="side-item active" data-source="SSD" data-path="/">
             <span class="side-icon drive-icon">▱</span><span>本地磁盘 (SSD)</span>
-          </button>
-          <button class="side-item nested" data-source="USB" data-path="/">
-            <span class="side-icon usb-icon">♆</span><span>可移动磁盘 (USB)</span>
-          </button>
-          <button class="side-item nested" data-source="USB2" data-path="/">
-            <span class="side-icon usb-icon">♆</span><span>可移动磁盘 (USB2)</span>
           </button>
           <div class="side-heading">网络</div>
           <button class="side-item" id="networkItem">
@@ -73,60 +61,20 @@
       </aside>
 
       <main class="content" id="content" tabindex="-1">
-        <section id="homeView">
-          <div class="welcome-row">
-            <div>
-              <p class="eyebrow">RK3576 私有存储</p>
-              <h1>主页</h1>
-              <p class="subtle">像使用电脑磁盘一样管理 SSD 和 U 盘中的文件。</p>
-            </div>
-            <div class="device-status"><span class="status-pulse"></span>设备在线</div>
-          </div>
-
-          <h2 class="section-title"><span class="chevron">⌄</span>设备和驱动器</h2>
-          <div class="drive-grid" id="driveGrid">
-            <button class="drive-card" data-source="SSD">
-              <span class="drive-illustration"><span class="drive-led"></span></span>
-              <span class="drive-detail">
-                <strong>本地磁盘 (SSD)</strong>
-                <span class="capacity-track"><i></i></span>
-                <span class="capacity-label">正在读取容量…</span>
-              </span>
-            </button>
-            <button class="drive-card" data-source="USB">
-              <span class="drive-illustration removable"><span class="drive-led"></span></span>
-              <span class="drive-detail">
-                <strong>可移动磁盘 (USB)</strong>
-                <span class="capacity-track"><i></i></span>
-                <span class="capacity-label">正在读取容量…</span>
-              </span>
-            </button>
-            <button class="drive-card" data-source="USB2">
-              <span class="drive-illustration removable"><span class="drive-led"></span></span>
-              <span class="drive-detail">
-                <strong>可移动磁盘 (USB2)</strong>
-                <span class="capacity-track"><i></i></span>
-                <span class="capacity-label">正在读取容量…</span>
-              </span>
-            </button>
-          </div>
-
-          <h2 class="section-title recent-title"><span class="chevron">⌄</span>快速访问</h2>
-          <div class="quick-grid">
-            <button data-source="SSD" data-path="/BaiduNetdiskDownload/" class="quick-card"><span>📥</span><b>百度网盘下载</b><small>SSD</small></button>
-            <button data-source="SSD" data-path="/Downloads/" class="quick-card"><span>⇩</span><b>下载</b><small>SSD</small></button>
-            <button data-source="USB" data-path="/" class="quick-card"><span>♆</span><b>U 盘</b><small>USB</small></button>
-            <button data-source="USB2" data-path="/" class="quick-card"><span>♆</span><b>U 盘 2</b><small>USB2</small></button>
-          </div>
-        </section>
-
-        <section id="filesView" hidden>
+        <section id="filesView">
           <div class="folder-heading">
             <div>
               <p class="eyebrow" id="sourceLabel">SSD</p>
               <h1 id="folderTitle">本地磁盘 (SSD)</h1>
             </div>
             <div class="folder-meta" id="folderMeta">正在加载…</div>
+          </div>
+          <div class="drive-capacity-strip" aria-label="SSD 容量">
+            <span class="drive-capacity-icon"><span></span></span>
+            <div class="drive-capacity-detail">
+              <div><strong>SSD 容量</strong><span id="ssdCapacityLabel">正在读取容量…</span></div>
+              <span class="capacity-track"><i id="ssdCapacityBar"></i></span>
+            </div>
           </div>
           <div class="file-table-wrap" id="dropZone">
             <table class="file-table">

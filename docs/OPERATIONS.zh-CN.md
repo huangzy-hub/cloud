@@ -2,22 +2,20 @@
 
 本文记录当前已经部署完成的私有云盘环境，供日常使用、设备接入、Key 管理、磁盘维护和故障排查使用。
 
-最后核对时间：2026-09-02。
+最后核对时间：2026-09-07。
 
 ## 1. 当前状态
 
 - 公网入口：`https://cloud.example.com/`
 - Headscale 控制端：`https://headscale.example.com/`
 - RK 的 Tailscale 地址：`<RK_TAILSCALE_IP>`（用 `tailscale ip -4` 查询）
-- Windows 网络驱动器：`Z:`（SSD）、`Y:`（U 盘）
-- Samba 共享：`RKSSD`、`RKUSB`、`RKUSB2`
+- Windows 网络驱动器：`Z:`（SSD）
+- Samba 共享：`RKSSD`
 - Samba 用户：`cloud`
 - SSD：`/dev/nvme0n1p1`，挂载到 `/srv/cloud/SSD`，约 116 GB 可用
-- U 盘：`/dev/sda1`，挂载到 `/srv/cloud/USB`，约 58 GB 可用
-- 第二块 U 盘：按 UUID 挂载到 `/srv/cloud/USB2`，当前为 exFAT
 - Web 和 `Z:` 操作的是同一份文件，不存在额外同步副本
 
-截至本文最后核对时，SSD 和 U 盘的用户可见内容均为空。网页中只显示 `SSD` 和 `USB` 两个存储入口。
+网页登录后直接进入 SSD 根目录，并在文件列表上方显示 SSD 的总容量、可用容量和占用进度。
 
 文件系统内部还保留以下隐藏内容：
 
@@ -30,23 +28,23 @@
 ## 2. 整体结构
 
 ```text
-Windows Z:/Y:
+Windows Z:\
   Windows -> Tailscale/Headscale -> RK Tailscale Serve -> Samba
-          -> /srv/cloud/SSD 和 /srv/cloud/USB
+          -> /srv/cloud/SSD
 
 公网网页：
   浏览器 -> HTTPS cloud.example.com -> 公网服务器 Nginx
          -> FRP 反向隧道 -> RK Nginx -> 单 Key 鉴权
-         -> FileBrowser Quantum -> /srv/cloud/{SSD,USB}
+         -> FileBrowser Quantum -> /srv/cloud/SSD
 ```
 
-公网服务器只承担 Headscale、HTTPS 和 FRP 转发，不保存云盘文件。实际数据始终位于 RK 上连接的 SSD 或 U 盘中。
+公网服务器只承担 Headscale、HTTPS 和 FRP 转发，不保存云盘文件。实际数据始终位于 RK 上连接的 SSD 中。
 
 ## 3. 从网页访问
 
 1. 打开部署时设置的云盘域名，例如 `https://cloud.example.com/`。
 2. 输入有效的访问 Key。
-3. 登录后，左侧可看到 `SSD` 和 `USB` 两个独立来源及各自的容量占用。
+3. 登录后直接进入 SSD 根目录，顶部可看到 SSD 容量占用。
 4. 可在权限允许的情况下上传、下载、新建目录、重命名和删除。
 
 陌生设备不需要安装 Tailscale，只要能访问 HTTPS 域名并持有有效 Key 即可登录。
@@ -65,37 +63,32 @@ Web 和 `Z:` 看到的是同一份文件，因此：
 
 重要文件在删除前应先复制到另一台设备或独立备份介质。
 
-## 4. 从 Windows 的 Z、Y 盘访问
+## 4. 从 Windows 的 Z 盘访问
 
 Windows 已通过 Headscale 管理的 Tailscale 网络连接到 RK。正常情况下：
 
 ```text
 Z:\  -> SSD
-Y:\  -> U 盘
 ```
 
 查看当前映射：
 
 ```powershell
 net use
-Get-PSDrive Z,Y
+Get-PSDrive Z
 ```
 
-验证两个存储入口：
+验证 SSD 存储入口：
 
 ```powershell
-Get-Item Z:\, Y:\
+Get-Item Z:\
 ```
 
 如果需要重新映射，先确认 Tailscale 已连接，然后执行：
 
 ```powershell
 net use Z: /delete
-net use Y: /delete
-net use X: /delete
 net use Z: \\<RK_TAILSCALE_IP>\RKSSD /user:cloud * /persistent:yes
-net use Y: \\<RK_TAILSCALE_IP>\RKUSB /user:cloud * /persistent:yes
-net use X: \\<RK_TAILSCALE_IP>\RKUSB2 /user:cloud * /persistent:yes
 ```
 
 命令中的 `*` 会让 Windows 交互式询问 Samba 密码，避免把密码留在命令历史中。
@@ -110,14 +103,14 @@ Test-NetConnection <RK_TAILSCALE_IP> -Port 445
 
 SMB 服务本身只监听 RK 的回环地址 `127.0.0.1:445`，由 Tailscale Serve 将 Tailnet 内的 `<RK_TAILSCALE_IP>:445` 转发到 Samba。因此校园网和公网不能直接访问 445 端口。
 
-### Z、Y 盘容量显示说明
+### Z 盘容量显示说明
 
-`Z:` 和 `Y:` 分别直接共享两个挂载点，因此 Windows 会分别显示 SSD 与 U 盘容量。旧的 `RKCloud` 共享以 `/srv/cloud` 为根，会错误显示 RK eMMC 容量，现已不再使用。
+`Z:` 直接共享 SSD 挂载点，因此 Windows 会显示 SSD 容量。旧的 `RKCloud` 共享以 `/srv/cloud` 为根，会错误显示 RK eMMC 容量，现已不再使用。
 
 以 RK 上的以下命令为准：
 
 ```sh
-df -hT /srv/cloud/SSD /srv/cloud/USB
+df -hT /srv/cloud/SSD
 ```
 
 ## 5. 存储目录与挂载
@@ -126,17 +119,15 @@ df -hT /srv/cloud/SSD /srv/cloud/USB
 
 ```text
 /srv/cloud
-├── SSD   -> 128 GB NVMe SSD
-└── USB   -> 64 GB U 盘
+└── SSD   -> 128 GB NVMe SSD
 ```
 
-这两个设备没有组成 RAID、LVM 或联合文件系统；它们只是分别挂载在共享根目录的两个子目录中。这样任一设备故障时不会同时破坏另一个设备的数据。
+SSD 独立挂载在 `/srv/cloud/SSD`，没有与 eMMC 组成 RAID、LVM 或联合文件系统。
 
 `/etc/fstab` 中当前使用 UUID 自动挂载：
 
 ```fstab
 UUID=<SSD_UUID> /srv/cloud/SSD ext4 defaults,noatime,nofail,x-systemd.device-timeout=10s 0 2
-UUID=<USB_UUID> /srv/cloud/USB ext4 defaults,noatime,nofail,x-systemd.device-timeout=10s 0 2
 ```
 
 检查设备、文件系统和挂载点：
@@ -144,26 +135,8 @@ UUID=<USB_UUID> /srv/cloud/USB ext4 defaults,noatime,nofail,x-systemd.device-tim
 ```sh
 lsblk -o NAME,MODEL,SIZE,FSTYPE,MOUNTPOINTS,TRAN
 findmnt /srv/cloud/SSD
-findmnt /srv/cloud/USB
-df -hT /srv/cloud/SSD /srv/cloud/USB
+df -hT /srv/cloud/SSD
 ```
-
-### 安全拔出 U 盘
-
-先停止对 U 盘的读写，再执行：
-
-```sh
-sync
-umount /srv/cloud/USB
-```
-
-确认 `findmnt /srv/cloud/USB` 没有输出后再拔出。重新插入后可执行：
-
-```sh
-mount /srv/cloud/USB
-```
-
-不要在仍有上传、下载或 SMB 文件操作时直接拔出 U 盘。
 
 ### 权限
 
@@ -444,14 +417,13 @@ tailscale serve status
 systemctl status smbd tailscaled --no-pager
 ```
 
-### SSD 或 USB 不显示
+### SSD 不显示
 
 ```sh
 lsblk -f
 findmnt /srv/cloud/SSD
-findmnt /srv/cloud/USB
 mount -a
-df -hT /srv/cloud/SSD /srv/cloud/USB
+df -hT /srv/cloud/SSD
 ```
 
 执行写操作前必须先确认目标设备确实已经挂载，避免把文件误写入 eMMC 上的空挂载目录。
@@ -536,7 +508,7 @@ tests/         鉴权、权限和公网读写测试
 每月或出现异常时执行：
 
 ```sh
-df -hT /srv/cloud/SSD /srv/cloud/USB
+df -hT /srv/cloud/SSD
 systemctl --failed
 systemctl is-active cloud-auth filebrowser-quantum nginx frpc-cloud smbd tailscaled
 cloudkey list
@@ -548,5 +520,5 @@ journalctl -p warning --since "-7 days" --no-pager
 - 重要文件存在另一份独立备份。
 - 临时访客 Key 已过期或撤销。
 - HTTPS 证书续期任务正常。
-- SSD 和 U 盘没有 I/O 错误。
+- SSD 没有 I/O 错误。
 - 不在脚本或文档中保存明文 Key 和密码。

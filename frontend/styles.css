@@ -150,6 +150,15 @@ h1 { font-size: 28px; margin: 2px 0 6px; font-weight: 600; letter-spacing: -.4px
 #filesView[hidden] { display: none; }
 .folder-heading { display: flex; justify-content: space-between; align-items: end; padding: 26px 31px 17px; }
 .folder-meta { color: #6b737a; font-size: 12px; }
+.drive-capacity-strip { display: flex; align-items: center; gap: 13px; margin: 0 28px 17px; padding: 12px 15px; border: 1px solid #dbe3e9; border-radius: 8px; background: #f8fafc; }
+.drive-capacity-icon { position: relative; flex: 0 0 auto; width: 42px; height: 29px; border-radius: 4px 4px 6px 6px; background: linear-gradient(#eef2f5 0 52%, #aeb8c1 53% 73%, #75838e 74%); box-shadow: inset 0 0 0 1px #9da8b2; }
+.drive-capacity-icon::before { content: ""; position: absolute; top: -5px; left: 6px; right: 6px; height: 7px; border: 1px solid #adb8c0; border-bottom: 0; border-radius: 4px 4px 0 0; background: #e5ebef; }
+.drive-capacity-icon span { position: absolute; right: 5px; bottom: 5px; width: 4px; height: 4px; border-radius: 50%; background: #39c24f; box-shadow: 0 0 4px #42dd59; }
+.drive-capacity-detail { flex: 1; min-width: 0; display: grid; gap: 7px; }
+.drive-capacity-detail > div { display: flex; justify-content: space-between; gap: 18px; align-items: center; }
+.drive-capacity-detail strong { font-size: 13px; font-weight: 600; }
+.drive-capacity-detail #ssdCapacityLabel { color: #5e6870; font-size: 12px; }
+.drive-capacity-strip .capacity-track { width: 100%; height: 8px; border-radius: 4px; }
 .file-table-wrap { position: relative; flex: 1; min-height: 260px; padding: 0 18px 40px; }
 .file-table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: 13px; }
 .file-table th { position: sticky; top: 0; z-index: 2; height: 34px; padding: 0 10px; background: #fbfcfd; border-bottom: 1px solid #d9dee3; border-right: 1px solid #e5e9ec; color: #4c555d; text-align: left; font-weight: 400; cursor: pointer; }
@@ -228,6 +237,7 @@ dialog input:focus { border-color: var(--accent); box-shadow: inset 0 -2px var(-
   .file-table th:nth-child(3) { display: none; }
   .file-table td:nth-child(3) { display: none; }
   .file-table th:nth-child(4) { width: 17%; }
+  .drive-capacity-detail > div { align-items: flex-start; flex-direction: column; gap: 2px; }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -242,6 +252,8 @@ dialog input:focus { border-color: var(--accent); box-shadow: inset 0 -2px var(-
   .command-link { color: #d2d9df; }
   .file-table th { color: #c7cdd2; }
   .capacity-track { background: #3b444a; border-color: #68737b; }
+  .drive-capacity-strip { background: #293138; border-color: #3b464e; }
+  .drive-capacity-detail #ssdCapacityLabel { color: #b3bbc1; }
   .capacity-label, .folder-meta, .connection-state, dialog p { color: #b3bbc1; }
   dialog input { background: #242b30; border-color: #68737b; }
   .dialog-actions button.secondary { background: #3a4248; color: #f1f3f5; border-color: #626c73; }

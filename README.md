@@ -1,6 +1,6 @@
 # RK Cloud
 
-在 RK3576、SSD/U 盘和一台公网 Linux 服务器上搭建的自托管私有云盘方案。
+在 RK3576、NVMe SSD 和一台公网 Linux 服务器上搭建的自托管私有云盘方案。
 
 它同时提供两条访问路径：
 
@@ -14,26 +14,26 @@
 ```text
 Windows 网络驱动器
   Windows -> Tailscale/Headscale -> Tailscale Serve -> Samba
-          -> Z: /srv/cloud/SSD, Y: /srv/cloud/USB, X: /srv/cloud/USB2
+          -> Z: /srv/cloud/SSD
 
 公网 Web
 Browser -> HTTPS/Nginx -> FRP -> RK Nginx -> cloud-auth
-          -> FileBrowser Quantum -> /srv/cloud/{SSD,USB,USB2}
+          -> FileBrowser Quantum -> /srv/cloud/SSD
 ```
 
-网页中将 SSD 和两块 U 盘配置成三个独立 source，因此可以分别显示三个文件系统的容量占用。
+网页登录后直接显示 SSD 根目录，并在文件列表上方展示 SSD 总容量、可用容量和占用进度。
 
 ## 功能
 
-- SSD、两块 U 盘独立挂载，并分别映射为 Windows `Z:`、`Y:`、`X:`，容量显示与物理盘一致。
+- SSD 独立挂载并映射为 Windows `Z:`，容量显示与物理盘一致。
 - Windows SMB 端口只在 RK 回环地址监听，再由 Tailscale Serve 暴露到 Tailnet。
 - 公网只开放 HTTPS；FRP 的 Web 出口在服务器上仅绑定 `127.0.0.1`。
 - 自定义单 Key 登录，支持创建、过期、撤销、轮换和全局会话失效。
 - Key 只保存 scrypt 散列，明文只在创建或轮换时显示一次。
 - FileBrowser Quantum 使用反向代理认证，无公开后台管理入口。
-- 自带仿 Windows 文件资源管理器网页：首页、地址栏、磁盘容量、详细列表与常用文件操作。
+- 自带仿 Windows 文件资源管理器网页和一致风格的 Key 登录页，支持地址栏、SSD 容量、详细列表与常用文件操作。
 - systemd 自动启动和重连；可选 NetworkManager 网络看门狗。
-- 包含单元测试、HTTP 集成测试和公网 SSD/USB CRUD 测试。
+- 包含单元测试、HTTP 集成测试和公网 SSD CRUD 测试。
 
 ## 文档
 
@@ -84,8 +84,6 @@ headscale.example.com   -> Headscale 域名
 tail.example.com        -> Tailnet MagicDNS 域
 203.0.113.10            -> 公网服务器 IP
 <SSD_UUID>              -> SSD 文件系统 UUID
-<USB_UUID>              -> U 盘文件系统 UUID
-<USB2_UUID>             -> 第二块 U 盘文件系统 UUID
 ```
 
 FRP token、Samba 密码、访问 Key 和 SSH 私钥不得提交到 Git。完整步骤见部署指南。
@@ -123,7 +121,7 @@ bash tests/integration.sh
   -HostName 'cloud.example.com'
 ```
 
-测试会在 SSD 和 USB 分别创建、读取、重命名并删除一个随机文件，并在 `finally` 中清理测试路径。建议使用短期临时 Key，不要把 owner Key 写进命令脚本或 CI 日志。
+测试会在 SSD 创建、读取、重命名并删除一个随机文件，并在 `finally` 中清理测试路径。建议使用短期临时 Key，不要把 owner Key 写进命令脚本或 CI 日志。
 
 ## 安全边界
 

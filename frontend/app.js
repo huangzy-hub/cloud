@@ -3,13 +3,11 @@
 
   const SOURCES = {
     SSD: { title: "本地磁盘 (SSD)", short: "SSD" },
-    USB: { title: "可移动磁盘 (USB)", short: "USB" },
-    USB2: { title: "可移动磁盘 (USB2)", short: "USB2" },
   };
   const CHUNK_SIZE = 10 * 1024 * 1024;
   const state = {
-    view: "home",
-    source: null,
+    view: "files",
+    source: "SSD",
     path: "/",
     entries: [],
     selected: null,
@@ -23,7 +21,7 @@
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => [...document.querySelectorAll(selector)];
   const elements = {
-    homeView: $("#homeView"), filesView: $("#filesView"), fileList: $("#fileList"),
+    filesView: $("#filesView"), fileList: $("#fileList"),
     loading: $("#loadingState"), empty: $("#emptyState"), breadcrumbs: $("#breadcrumbs"),
     folderTitle: $("#folderTitle"), folderMeta: $("#folderMeta"), sourceLabel: $("#sourceLabel"),
     status: $("#statusText"), selection: $("#selectionText"), search: $("#searchInput"),
@@ -33,6 +31,7 @@
     fileInput: $("#fileInput"), dropZone: $("#dropZone"), transferPanel: $("#transferPanel"),
     transferList: $("#transferList"), promptDialog: $("#promptDialog"),
     confirmDialog: $("#confirmDialog"), content: $("#content"),
+    capacityLabel: $("#ssdCapacityLabel"), capacityBar: $("#ssdCapacityBar"),
   };
 
   function apiUrl(endpoint, params = {}) {
@@ -149,49 +148,29 @@
   async function loadCapacities() {
     try {
       const info = await jsonFetch("settings/sources");
-      Object.keys(SOURCES).forEach((source) => updateDriveCard(source, info[source]));
+      updateCapacity(info.SSD);
       setOnline(true);
     } catch (error) {
-      Object.keys(SOURCES).forEach((source) => updateDriveCard(source, null));
+      updateCapacity(null);
       setOnline(false);
       toast(`容量读取失败：${error.message}`, "error");
     }
   }
 
-  function updateDriveCard(source, info) {
-    const card = $(`.drive-card[data-source="${source}"]`);
-    if (!card) return;
-    const label = card.querySelector(".capacity-label");
-    const bar = card.querySelector(".capacity-track i");
+  function updateCapacity(info) {
     const total = Number(info?.total) || 0;
     const used = Number(info?.usedAlt ?? info?.used) || 0;
     if (!total) {
-      label.textContent = "容量暂不可用";
-      bar.style.width = "0%";
+      elements.capacityLabel.textContent = "容量暂不可用";
+      elements.capacityBar.style.width = "0%";
+      elements.capacityBar.className = "";
       return;
     }
     const free = Math.max(0, total - used);
     const percent = Math.min(100, (used / total) * 100);
-    label.textContent = `${formatBytes(free)} 可用，共 ${formatBytes(total)}`;
-    bar.style.width = `${percent}%`;
-    bar.className = percent >= 90 ? "danger" : percent >= 75 ? "warning" : "";
-  }
-
-  function showHome(push = true) {
-    state.view = "home";
-    state.source = null;
-    state.path = "/";
-    state.entries = [];
-    state.selected = null;
-    elements.homeView.hidden = false;
-    elements.filesView.hidden = true;
-    elements.search.placeholder = "在此电脑中搜索";
-    updateSelection();
-    renderBreadcrumbs();
-    activateSidebar("home", "/");
-    elements.status.textContent = "3 个驱动器";
-    if (push) pushHistory({ view: "home" });
-    loadCapacities();
+    elements.capacityLabel.textContent = `${formatBytes(free)} 可用，共 ${formatBytes(total)}（已用 ${Math.round(percent)}%）`;
+    elements.capacityBar.style.width = `${percent}%`;
+    elements.capacityBar.className = percent >= 90 ? "danger" : percent >= 75 ? "warning" : "";
   }
 
   async function openFolder(source, path = "/", push = true) {
@@ -200,8 +179,6 @@
     state.source = source;
     state.path = cleanPath(path);
     state.selected = null;
-    elements.homeView.hidden = true;
-    elements.filesView.hidden = false;
     elements.loading.hidden = false;
     elements.empty.hidden = true;
     elements.fileList.innerHTML = "";
@@ -214,6 +191,7 @@
     updateSelection();
     updateNavigationButtons();
     if (push) pushHistory({ view: "files", source, path: state.path });
+    loadCapacities();
 
     state.loading = true;
     try {
@@ -307,13 +285,9 @@
   }
 
   function renderBreadcrumbs() {
-    if (state.view === "home") {
-      elements.breadcrumbs.innerHTML = '<button class="crumb" data-home="true"><span class="crumb-icon">▰</span>主页</button>';
-      return;
-    }
     const parts = state.path.split("/").filter(Boolean);
     let accumulated = "/";
-    const crumbs = [`<button class="crumb" data-home="true"><span class="crumb-icon">▰</span>主页</button>`, `<button class="crumb" data-source="${state.source}" data-path="/">${escapeHtml(SOURCES[state.source].title)}</button>`];
+    const crumbs = [`<button class="crumb" data-source="SSD" data-path="/"><span class="crumb-icon">▱</span>${escapeHtml(SOURCES.SSD.title)}</button>`];
     parts.forEach((part) => {
       accumulated = joinPath(accumulated, part, true);
       crumbs.push(`<button class="crumb" data-source="${state.source}" data-path="${escapeHtml(accumulated)}">${escapeHtml(decodeURIComponent(part))}</button>`);
@@ -321,13 +295,9 @@
     elements.breadcrumbs.innerHTML = crumbs.join("");
   }
 
-  function activateSidebar(target, path) {
+  function activateSidebar(target) {
     $$(".side-item").forEach((item) => item.classList.remove("active"));
-    if (target === "home") $(".side-item[data-target='home']").classList.add("active");
-    else {
-      const selector = `.side-item.nested[data-source="${target}"]`;
-      ($(selector) || $(`.side-item[data-source="${target}"]`))?.classList.add("active");
-    }
+    $(`.side-item[data-source="${target}"]`)?.classList.add("active");
   }
 
   function pushHistory(locationState) {
@@ -339,14 +309,14 @@
   }
 
   function updateHash() {
-    const hash = state.view === "home" ? "#/home" : `#/${encodeURIComponent(state.source)}${state.path.split("/").map(encodeURIComponent).join("/")}`;
+    const hash = `#/${encodeURIComponent(state.source)}${state.path.split("/").map(encodeURIComponent).join("/")}`;
     history.replaceState(null, "", hash);
   }
 
   function updateNavigationButtons() {
     elements.back.disabled = state.historyIndex <= 0;
     elements.forward.disabled = state.historyIndex >= state.history.length - 1;
-    elements.up.disabled = state.view === "home";
+    elements.up.disabled = state.path === "/";
   }
 
   function travel(delta) {
@@ -354,7 +324,7 @@
     if (index < 0 || index >= state.history.length) return;
     state.historyIndex = index;
     const destination = state.history[index];
-    destination.view === "home" ? showHome(false) : openFolder(destination.source, destination.path, false);
+    openFolder(destination.source, destination.path, false);
     updateNavigationButtons();
     updateHash();
   }
@@ -457,19 +427,17 @@
   }
 
   function bindEvents() {
-    $$(".drive-card, .quick-card, .side-item[data-source]").forEach((item) => item.addEventListener("dblclick", () => openFolder(item.dataset.source, item.dataset.path || "/")));
-    $$(".drive-card, .quick-card, .side-item[data-source]").forEach((item) => item.addEventListener("click", () => openFolder(item.dataset.source, item.dataset.path || "/")));
-    $(".side-item[data-target='home']").addEventListener("click", () => showHome());
+    $$(".side-item[data-source]").forEach((item) => item.addEventListener("click", () => openFolder(item.dataset.source, item.dataset.path || "/")));
     $("#networkItem").addEventListener("click", () => toast("RK3576 已通过 Headscale/Tailscale 安全网络连接"));
     elements.breadcrumbs.addEventListener("click", (event) => {
       const crumb = event.target.closest(".crumb");
       if (!crumb) return;
-      crumb.dataset.home ? showHome() : openFolder(crumb.dataset.source, crumb.dataset.path);
+      openFolder(crumb.dataset.source, crumb.dataset.path);
     });
     elements.back.addEventListener("click", () => travel(-1));
     elements.forward.addEventListener("click", () => travel(1));
-    elements.up.addEventListener("click", () => state.view === "files" && (state.path === "/" ? showHome() : openFolder(state.source, parentPath(state.path))));
-    elements.refresh.addEventListener("click", () => state.view === "home" ? loadCapacities() : openFolder(state.source, state.path, false));
+    elements.up.addEventListener("click", () => state.path !== "/" && openFolder(state.source, parentPath(state.path)));
+    elements.refresh.addEventListener("click", () => openFolder(state.source, state.path, false));
     elements.newFolder.addEventListener("click", createFolder);
     elements.upload.addEventListener("click", () => elements.fileInput.click());
     elements.fileInput.addEventListener("change", () => { uploadFiles([...elements.fileInput.files]); elements.fileInput.value = ""; });
@@ -503,11 +471,11 @@
 
   function startFromHash() {
     const raw = location.hash.replace(/^#\/?/, "");
-    if (!raw || raw === "home") return showHome();
+    if (!raw || raw === "home") return openFolder("SSD", "/");
     const parts = raw.split("/");
     const source = decodeURIComponent(parts.shift());
     const path = cleanPath(`/${parts.map(decodeURIComponent).join("/")}`);
-    return SOURCES[source] ? openFolder(source, path) : showHome();
+    return SOURCES[source] ? openFolder(source, path) : openFolder("SSD", "/");
   }
 
   bindEvents();

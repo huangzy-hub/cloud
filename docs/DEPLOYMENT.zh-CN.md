@@ -1,23 +1,23 @@
 # RK3576 私有云盘完整部署指南
 
-本文从空白 Debian 主机开始，复现一套同时支持 Windows 网络驱动器和公网 Web 的私有云盘。示例环境是 RK3576（Debian 12 ARM64）、一块 NVMe SSD、两块 U 盘、一台 Debian 公网服务器和一台 Windows 电脑。
+本文从空白 Debian 主机开始，复现一套同时支持 Windows 网络驱动器和公网 Web 的私有云盘。示例环境是 RK3576（Debian 12 ARM64）、一块 NVMe SSD、一台 Debian 公网服务器和一台 Windows 电脑。
 
 最终有两条访问链路：
 
 ```text
-私有文件协议：Windows -> Tailscale/Headscale -> RK -> Samba -> SSD/USB/USB2
+私有文件协议：Windows -> Tailscale/Headscale -> RK -> Samba -> SSD
 公网网页：浏览器 -> HTTPS -> 公网 Nginx -> FRP -> RK Nginx
-                    -> 单 Key 鉴权 -> FileBrowser -> SSD/USB/USB2
+                    -> 单 Key 鉴权 -> FileBrowser -> SSD
 ```
 
-公网服务器只负责 Headscale 控制、TLS 终止和流量转发，不保存云盘文件。SSD 与两块 U 盘是三个独立文件系统；Samba 将它们分别共享为 Windows `Z:`、`Y:`、`X:`，FileBrowser 也显示为三个 source，因此两端都能报告各自容量。
+公网服务器只负责 Headscale 控制、TLS 终止和流量转发，不保存云盘文件。SSD 由 Samba 共享为 Windows `Z:`，网页登录后直接进入同一 SSD 根目录，并显示其总容量和占用进度。
 
 ## 1. 部署前准备
 
 准备以下资源：
 
 - RK3576 或其他 ARM64 Linux 主机，建议 4 GB 以上内存；
-- 一块 SSD 和两块 U 盘；
+- 一块 NVMe SSD；
 - 一台有公网 IPv4 的 Debian 12/Ubuntu 服务器；
 - 两个解析到公网服务器的域名；
 - Windows 10/11 客户端；
@@ -35,8 +35,6 @@
 | RK Tailscale 名称 | `rk3576-cloud` |
 | RK Tailscale IP | `<RK_TAILSCALE_IP>` |
 | SSD UUID | `<SSD_UUID>` |
-| U 盘 UUID | `<USB_UUID>` |
-| 第二块 U 盘 UUID | `<USB2_UUID>` |
 
 先克隆仓库：
 
@@ -61,7 +59,7 @@ ip -br address
 ip route
 ```
 
-确认系统是 `aarch64`，并通过 `MODEL`、`SIZE` 和 `TRAN` 分清 eMMC、NVMe 和 U 盘。后续示例假设 SSD 是 `/dev/nvme0n1`、U 盘是 `/dev/sda`；你的名称可能不同。
+确认系统是 `aarch64`，并通过 `MODEL`、`SIZE` 和 `TRAN` 分清 eMMC 与 NVMe。后续示例假设 SSD 是 `/dev/nvme0n1`；你的名称可能不同。
 
 如果 RK 尚未联网，可先用 NetworkManager 连接普通 WPA2 热点：
 
@@ -74,7 +72,7 @@ ping -c 3 1.1.1.1
 
 校园网若使用 802.1X，必须根据学校给出的 EAP 类型、匿名身份、CA 证书和二阶段认证配置，不能只凭账号密码猜测。建议先用普通热点完成软件部署，再单独迁移网络配置。
 
-## 3. 初始化并挂载 SSD 与 U 盘
+## 3. 初始化并挂载 SSD
 
 > **危险：本节的 `wipefs`、`parted` 和 `mkfs.ext4` 会清空选定磁盘。** 先用 `lsblk`、`blkid`、`findmnt` 三次确认设备名。不要对系统所在的 `mmcblk0` 操作。如果要保留旧数据，跳过格式化并先做备份。
 
@@ -82,25 +80,21 @@ ping -c 3 1.1.1.1
 
 ```sh
 systemctl stop filebrowser-quantum smbd 2>/dev/null || true
-findmnt /dev/nvme0n1 /dev/sda || true
+findmnt /dev/nvme0n1 || true
 ```
 
-确认目标后，为两块盘各建一个 GPT 分区和 ext4 文件系统：
+确认目标后，为 SSD 建立 GPT 分区和 ext4 文件系统：
 
 ```sh
 wipefs -a /dev/nvme0n1
 parted -s /dev/nvme0n1 mklabel gpt mkpart primary ext4 0% 100%
 mkfs.ext4 -L RK_SSD /dev/nvme0n1p1
-
-wipefs -a /dev/sda
-parted -s /dev/sda mklabel gpt mkpart primary ext4 0% 100%
-mkfs.ext4 -L RK_USB /dev/sda1
 ```
 
 读取 UUID，并记录输出：
 
 ```sh
-blkid /dev/nvme0n1p1 /dev/sda1
+blkid /dev/nvme0n1p1
 ```
 
 创建专用用户和挂载目录：
@@ -109,38 +103,24 @@ blkid /dev/nvme0n1p1 /dev/sda1
 getent group cloud >/dev/null || groupadd --system cloud
 id cloud >/dev/null 2>&1 || useradd --system --gid cloud \
   --home-dir /nonexistent --shell /usr/sbin/nologin cloud
-install -d -m 0770 -o cloud -g cloud /srv/cloud/SSD /srv/cloud/USB
+install -d -m 0770 -o cloud -g cloud /srv/cloud/SSD
 ```
 
-在 `/etc/fstab` 末尾添加，替换两个 UUID：
+在 `/etc/fstab` 末尾添加并替换 UUID：
 
 ```fstab
 UUID=<SSD_UUID> /srv/cloud/SSD ext4 defaults,noatime,nofail,x-systemd.device-timeout=10s 0 2
-UUID=<USB_UUID> /srv/cloud/USB ext4 defaults,noatime,nofail,x-systemd.device-timeout=10s 0 2
 ```
-
-如需加入第二块保持 exFAT 格式的 U 盘，可单独创建安全挂载点。先用 `id cloud` 查出实际 UID/GID，再替换下例中的数值：
-
-```sh
-install -d -m 0000 -o root -g root /srv/cloud/USB2
-echo 'UUID=<USB2_UUID> /srv/cloud/USB2 exfat defaults,noatime,nosuid,nodev,nofail,x-systemd.automount,x-systemd.device-timeout=10s,uid=<CLOUD_UID>,gid=<CLOUD_GID>,fmask=0007,dmask=0007 0 0' >> /etc/fstab
-systemctl daemon-reload
-mount /srv/cloud/USB2
-findmnt /srv/cloud/USB2
-```
-
-未挂载时将目录权限保持为 `0000`，可以防止 FileBrowser 或 Samba 意外把 USB2 文件写进 eMMC。exFAT 不保存 Linux 属主和权限，所以通过挂载参数将所有文件映射给 `cloud` 用户。
 
 挂载并设置根目录权限：
 
 ```sh
 systemctl daemon-reload
 mount -a
-chown cloud:cloud /srv/cloud/SSD /srv/cloud/USB
-chmod 0770 /srv/cloud/SSD /srv/cloud/USB
+chown cloud:cloud /srv/cloud/SSD
+chmod 0770 /srv/cloud/SSD
 findmnt /srv/cloud/SSD
-findmnt /srv/cloud/USB
-df -hT /srv/cloud/SSD /srv/cloud/USB /srv/cloud/USB2
+df -hT /srv/cloud/SSD
 ```
 
 Linux 看到块设备不等于可以直接放文件。挂载把文件系统的根目录接入系统目录树；不挂载时向 `/srv/cloud/SSD` 写入的数据会落到 eMMC 上的同名普通目录，所以每次开机都要检查 `findmnt`。
@@ -260,7 +240,7 @@ ping <RK_TAILSCALE_IP>
 
 Tailscale 会优先尝试 NAT 穿透形成点对点 WireGuard 链路；校园网限制较严时会退回 DERP 中继，只要控制端、DERP 和 HTTPS 可达仍可连接。`tailscale status` 或 `tailscale ping <目标>` 可查看是 `direct` 还是 `relay`。
 
-## 6. 部署 Samba 并挂载 Z、Y 盘
+## 6. 部署 Samba 并挂载 Z 盘
 
 在 RK 安装 Samba：
 
@@ -287,18 +267,14 @@ tailscale serve --bg --tcp=445 tcp://127.0.0.1:445
 tailscale serve status
 ```
 
-在 Windows 管理员 PowerShell 中分别挂载两个网络驱动器：
+在 Windows PowerShell 中挂载 SSD 网络驱动器：
 
 ```powershell
 net use Z: /delete /y
-net use Y: /delete /y
-net use X: /delete /y
 net use Z: "\\<RK_TAILSCALE_IP>\RKSSD" /user:cloud * /persistent:yes
-net use Y: "\\<RK_TAILSCALE_IP>\RKUSB" /user:cloud * /persistent:yes
-net use X: "\\<RK_TAILSCALE_IP>\RKUSB2" /user:cloud * /persistent:yes
 ```
 
-第一次命令中的星号会让 Windows 安全地交互输入 Samba 密码；后续命令通常会复用同一服务器凭据。不要把密码写入 `.bat`、PowerShell 历史或 Git。`Z:` 是 SSD，`Y:`、`X:` 是两块 U 盘，Windows 显示的容量会分别对应三个真实文件系统。
+星号会让 Windows 安全地交互输入 Samba 密码。不要把密码写入 `.bat`、PowerShell 历史或 Git。`Z:` 直接对应 SSD，因此 Windows 显示的是 SSD 的真实容量。
 
 ## 7. 在 RK 部署 FileBrowser Quantum
 
@@ -329,13 +305,13 @@ systemctl status --no-pager filebrowser-quantum
 curl -I http://127.0.0.1:18082/
 ```
 
-这里不能把 `/srv/cloud` 配成一个 source：它只是 eMMC 上的父目录，内部跨越多个挂载点，容量会被识别成父文件系统容量。把 `/srv/cloud/SSD`、`/srv/cloud/USB` 和 `/srv/cloud/USB2` 配成独立 source 后，FileBrowser 才能分别读取正确的文件系统统计。`frontend.disableUsedPercentage: false` 会显示占用条。
+这里不能把 `/srv/cloud` 配成 source：它只是 eMMC 上的父目录，容量会被识别成系统盘容量。FileBrowser 必须直接使用 `/srv/cloud/SSD`，`frontend.disableUsedPercentage: false` 会提供真实 SSD 容量统计。
 
 FileBrowser 使用 `X-Forwarded-User` 代理认证。它必须只监听 `127.0.0.1`，否则攻击者可自行伪造这个头绕过登录。
 
 ### 安装资源管理器风格网页
 
-仓库的 `frontend/` 是一个不依赖 Node.js 构建环境的静态前端。它通过 FileBrowser Quantum 的同源 API 读取真实目录、文件夹大小和磁盘容量，并提供目录浏览、搜索、上传、下载、新建文件夹、重命名和删除。文件夹下载由新界面直接请求 ZIP 压缩包，不依赖旧页面。旧 FileBrowser 页面不再公开，访问 `/files/` 会跳回 `/explorer/`；FileBrowser 后端仍作为内部文件 API 使用。
+仓库的 `frontend/` 是一个不依赖 Node.js 构建环境的静态前端。网页登录后会直接打开 SSD 根目录，在文件列表上方显示 SSD 总容量、可用容量和占用进度，并提供目录浏览、搜索、上传、下载、新建文件夹、重命名和删除。文件夹下载由新界面直接请求 ZIP 压缩包，不依赖旧页面。旧 FileBrowser 页面不再公开，访问 `/files/` 会跳回 `/explorer/`；FileBrowser 后端仍作为内部文件 API 使用。
 
 ```sh
 install -d -m 0755 /usr/local/share/rk-cloud/explorer
@@ -558,13 +534,13 @@ systemctl list-timers rk-wifi-watchdog.timer
 ```sh
 systemctl --no-pager --full status \
   tailscaled smbd filebrowser-quantum cloud-auth nginx frpc-cloud
-findmnt /srv/cloud/SSD /srv/cloud/USB
-df -hT /srv/cloud/SSD /srv/cloud/USB
+findmnt /srv/cloud/SSD
+df -hT /srv/cloud/SSD
 ss -lntp | grep -E ':(445|18080|18081|18082)\b'
 tailscale serve status
 ```
 
-预期：445、18080、18081、18082 都只监听回环；445 另由 Tailscale IP 提供；三个存储目录的 `SOURCE` 分别对应真实 SSD 和两块 U 盘。
+预期：445、18080、18081、18082 都只监听回环；445 另由 Tailscale IP 提供；`/srv/cloud/SSD` 对应真实 NVMe 分区。
 
 ### 公网服务器检查
 
@@ -579,8 +555,8 @@ curl -I https://cloud.example.com/login
 
 1. 打开云盘 HTTPS 域名；
 2. 输入 `cloudkey add` 创建的 Key；
-3. 左侧应看到 `SSD`、`USB` 和 `USB2` 三个来源及各自容量；
-4. 分别在三个来源中新建、上传、重命名、下载和删除测试文件；
+3. 登录后应直接进入 SSD 根目录，并看到 SSD 总容量进度条；
+4. 在 SSD 中新建、上传、重命名、下载和删除测试文件；
 5. 在 Windows `Z:` 盘确认能看到同一文件变化。
 
 也可在 Windows 使用仓库内的自动化脚本：
@@ -600,7 +576,7 @@ curl -I https://cloud.example.com/login
 reboot
 ```
 
-重新上线后重复 `findmnt`、`df`、`systemctl`、`tailscale serve status` 和公网 CRUD 测试。仓库中的 FileBrowser 服务和 Samba drop-in 都有 `mountpoint` 前置检查；U 盘或 SSD 缺失时服务会拒绝启动，避免把文件误写进未挂载的 eMMC 目录。
+重新上线后重复 `findmnt`、`df`、`systemctl`、`tailscale serve status` 和公网 CRUD 测试。仓库中的 FileBrowser 服务和 Samba drop-in 都有 SSD `mountpoint` 前置检查；SSD 缺失时服务会拒绝启动，避免把文件误写进未挂载的 eMMC 目录。
 
 ## 13. 常见故障
 
@@ -633,7 +609,7 @@ journalctl -u cloud-auth -n 100 --no-pager
 
 Key 可能已过期、被撤销或已轮换。不要尝试读取旧明文；用 `cloudkey rotate <name>` 生成替代 Key。
 
-### Z 或 Y 盘断开
+### Z 盘断开
 
 ```powershell
 & "$env:ProgramFiles\Tailscale\tailscale.exe" status
@@ -654,7 +630,7 @@ ss -lntp | grep ':445'
 
 ### 网页容量不显示或不正确
 
-确认配置中是 `/srv/cloud/SSD`、`/srv/cloud/USB`、`/srv/cloud/USB2` 三个独立 source，且：
+确认配置中的唯一 source 是 `/srv/cloud/SSD`，且：
 
 ```yaml
 frontend:
@@ -667,7 +643,7 @@ frontend:
 systemctl restart filebrowser-quantum
 ```
 
-如果把父目录 `/srv/cloud` 当成单一 source，它无法代表三个挂载点的容量总和。
+如果误把父目录 `/srv/cloud` 当成 source，网页会显示 RK eMMC 容量而不是 SSD 容量。
 
 ## 14. 备份与升级
 
@@ -680,7 +656,7 @@ systemctl restart filebrowser-quantum
 - `/etc/headscale/`、`/var/lib/headscale/`；
 - `/etc/samba/smb.conf`；
 - Nginx 站点配置和证书续期配置；
-- SSD、U 盘上的实际数据。
+- SSD 上的实际数据。
 
 升级第三方程序前，先阅读 release notes，保存当前二进制和数据库，再在临时 Key 下完成登录、上传、下载、删除和重启测试。Headscale、Tailscale 客户端和 FileBrowser 的配置格式会随大版本变化，不要无审查地自动升级。
 

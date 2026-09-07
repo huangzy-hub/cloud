@@ -54,7 +54,8 @@ class CloudAuthTests(unittest.TestCase):
 
     def test_login_page_renders_css_and_escapes_values(self):
         page = cloud_auth.build_login_page('/SSD/\"<test>', "bad <key>").decode("utf-8")
-        self.assertIn(":root{color-scheme:dark}", page)
+        self.assertIn(":root{color-scheme:light", page)
+        self.assertIn("访问 SSD 云盘", page)
         self.assertIn("bad &lt;key&gt;", page)
         self.assertIn('value="/SSD/&quot;&lt;test&gt;"', page)
         self.assertNotIn("{error}", page)

@@ -29,7 +29,7 @@ try {
     if (-not $cookieLine) { throw 'login did not return a session cookie' }
     $cookie = (($cookieLine -replace '^Set-Cookie:\s*', '').Split(';')[0])
 
-    foreach ($disk in @('SSD', 'USB')) {
+    foreach ($disk in @('SSD')) {
         $source = [uri]::EscapeDataString($disk)
         $original = "/rk-cloud-e2e-$id.txt"
         $renamed = "/rk-cloud-e2e-$id-renamed.txt"
