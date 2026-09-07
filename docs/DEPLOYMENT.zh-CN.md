@@ -311,7 +311,7 @@ FileBrowser 使用 `X-Forwarded-User` 代理认证。它必须只监听 `127.0.0
 
 ### 安装资源管理器风格网页
 
-仓库的 `frontend/` 是一个不依赖 Node.js 构建环境的静态前端。网页登录后会直接打开 SSD 根目录，在文件列表上方显示 SSD 总容量、可用容量和占用进度，并提供目录浏览、搜索、上传、下载、新建文件夹、重命名和删除。文件夹下载由新界面直接请求 ZIP 压缩包，不依赖旧页面。旧 FileBrowser 页面不再公开，访问 `/files/` 会跳回 `/explorer/`；FileBrowser 后端仍作为内部文件 API 使用。
+仓库的 `frontend/` 是一个不依赖 Node.js 构建环境的静态前端。网页登录后会直接打开 SSD 根目录，在文件列表上方显示 SSD 总容量、可用容量和占用进度，并提供目录浏览、搜索、文件与文件夹上传、拖放上传、下载、新建文件夹、重命名和删除。文件夹上传会保留浏览器提供的相对目录结构；同名文件出现时会询问是否覆盖，并将选择应用到当前批次。文件夹下载由新界面直接请求 ZIP 压缩包，不依赖旧页面。旧 FileBrowser 页面不再公开，访问 `/files/` 会跳回 `/explorer/`；FileBrowser 后端仍作为内部文件 API 使用。
 
 ```sh
 install -d -m 0755 /usr/local/share/rk-cloud/explorer

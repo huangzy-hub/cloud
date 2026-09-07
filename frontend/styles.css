@@ -225,6 +225,8 @@ dialog input:focus { border-color: var(--accent); box-shadow: inset 0 -2px var(-
 .transfer-progress { height: 4px; border-radius: 2px; background: #e3e7ea; overflow: hidden; }
 .transfer-progress i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .15s linear; }
 .transfer-item.error .transfer-progress i { background: #c42b1c; }
+.transfer-item.skipped { color: var(--muted); }
+.transfer-item.skipped .transfer-progress i { background: #8a9299; }
 
 @media (max-width: 900px) {
   .workspace { grid-template-columns: 194px minmax(0, 1fr); }

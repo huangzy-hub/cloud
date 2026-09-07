@@ -35,8 +35,10 @@
     <section class="command-bar" aria-label="文件操作">
       <button id="newFolderButton"><span class="command-icon">＋</span>新建文件夹</button>
       <span class="separator"></span>
-      <button id="uploadButton"><span class="command-icon">⇧</span>上传</button>
+      <button id="uploadButton"><span class="command-icon">⇧</span>上传文件</button>
       <input id="fileInput" type="file" multiple hidden>
+      <button id="uploadFolderButton"><span class="command-icon">▣</span>上传文件夹</button>
+      <input id="folderInput" type="file" webkitdirectory directory multiple hidden>
       <button id="downloadButton" disabled><span class="command-icon">⇩</span>下载</button>
       <button id="renameButton" disabled><span class="command-icon">✎</span>重命名</button>
       <button id="deleteButton" disabled><span class="command-icon">⌫</span>删除</button>
@@ -85,7 +87,7 @@
               <div class="empty-folder">⌑</div><strong>此文件夹为空</strong><span>可将文件拖到此处上传</span>
             </div>
             <div class="loading-state" id="loadingState"><span class="spinner"></span>正在加载文件…</div>
-            <div class="drop-overlay" id="dropOverlay"><div>⇧</div><strong>释放以上传到当前文件夹</strong></div>
+            <div class="drop-overlay" id="dropOverlay"><div>⇧</div><strong>释放以上传文件或文件夹</strong></div>
           </div>
         </section>
       </main>
@@ -112,7 +114,7 @@
     <form method="dialog">
       <div class="warning-icon">!</div>
       <div><h2 id="confirmTitle">删除文件</h2><p id="confirmDescription">此操作无法撤销。</p></div>
-      <div class="dialog-actions full"><button value="cancel" class="secondary">取消</button><button value="confirm" class="danger">删除</button></div>
+      <div class="dialog-actions full"><button value="cancel" class="secondary">取消</button><button value="confirm" id="confirmAccept">确定</button></div>
     </form>
   </dialog>
 

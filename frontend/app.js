@@ -16,6 +16,7 @@
     history: [],
     historyIndex: -1,
     loading: false,
+    uploading: false,
   };
 
   const $ = (selector) => document.querySelector(selector);
@@ -28,7 +29,8 @@
     back: $("#backButton"), forward: $("#forwardButton"), up: $("#upButton"),
     refresh: $("#refreshButton"), download: $("#downloadButton"), rename: $("#renameButton"),
     delete: $("#deleteButton"), upload: $("#uploadButton"), newFolder: $("#newFolderButton"),
-    fileInput: $("#fileInput"), dropZone: $("#dropZone"), transferPanel: $("#transferPanel"),
+    uploadFolder: $("#uploadFolderButton"), fileInput: $("#fileInput"), folderInput: $("#folderInput"),
+    dropZone: $("#dropZone"), transferPanel: $("#transferPanel"),
     transferList: $("#transferList"), promptDialog: $("#promptDialog"),
     confirmDialog: $("#confirmDialog"), content: $("#content"),
     capacityLabel: $("#ssdCapacityLabel"), capacityBar: $("#ssdCapacityBar"),
@@ -265,7 +267,8 @@
     elements.rename.disabled = !has;
     elements.delete.disabled = !has;
     elements.newFolder.disabled = state.view !== "files";
-    elements.upload.disabled = state.view !== "files";
+    elements.upload.disabled = state.view !== "files" || state.uploading;
+    elements.uploadFolder.disabled = state.view !== "files" || state.uploading;
     elements.up.disabled = state.view === "home";
     elements.selection.textContent = has ? `已选择 1 个项目  ${formatBytes(state.selected.size)}` : "";
   }
@@ -359,7 +362,7 @@
 
   async function deleteSelected() {
     if (!state.selected) return;
-    const confirmed = await confirmAction("永久删除此项目？", `“${state.selected.name}”将被直接删除，无法从回收站恢复。`);
+    const confirmed = await confirmAction("永久删除此项目？", `“${state.selected.name}”将被直接删除，无法从回收站恢复。`, "删除", true);
     if (!confirmed) return;
     try {
       await apiFetch("resources", { source: state.source, path: entryPath(state.selected) }, { method: "DELETE" });
@@ -378,52 +381,177 @@
     return new Promise((resolve) => elements.promptDialog.addEventListener("close", () => resolve(elements.promptDialog.returnValue === "confirm" ? $("#promptInput").value.trim() : ""), { once: true }));
   }
 
-  function confirmAction(title, description) {
+  function confirmAction(title, description, confirmLabel = "确定", danger = false) {
     $("#confirmTitle").textContent = title;
     $("#confirmDescription").textContent = description;
+    const accept = $("#confirmAccept");
+    accept.textContent = confirmLabel;
+    accept.classList.toggle("danger", danger);
     elements.confirmDialog.showModal();
     return new Promise((resolve) => elements.confirmDialog.addEventListener("close", () => resolve(elements.confirmDialog.returnValue === "confirm"), { once: true }));
   }
 
-  function addTransfer(file) {
+  function addTransfer(name) {
     elements.transferPanel.hidden = false;
     const item = document.createElement("div");
     item.className = "transfer-item";
-    item.innerHTML = `<div class="transfer-name"><span>${escapeHtml(file.name)}</span><span>等待中</span></div><div class="transfer-progress"><i></i></div>`;
-    elements.transferList.prepend(item);
+    item.innerHTML = `<div class="transfer-name"><span title="${escapeHtml(name)}">${escapeHtml(name)}</span><span>等待中</span></div><div class="transfer-progress"><i></i></div>`;
+    elements.transferList.append(item);
     return {
       update(percent, text) { item.querySelector("i").style.width = `${percent}%`; item.querySelector(".transfer-name span:last-child").textContent = text || `${Math.round(percent)}%`; },
       error(text) { item.classList.add("error"); item.querySelector(".transfer-name span:last-child").textContent = text; },
+      skip(text = "已跳过") { item.classList.add("skipped"); item.querySelector(".transfer-name span:last-child").textContent = text; },
     };
   }
 
-  async function uploadFiles(files) {
-    if (state.view !== "files" || !files.length) return;
-    const source = state.source, path = state.path;
-    for (const file of files) {
-      const transfer = addTransfer(file);
-      try {
-        let offset = 0;
-        while (offset < file.size || (file.size === 0 && offset === 0)) {
-          const chunk = file.slice(offset, Math.min(offset + CHUNK_SIZE, file.size));
-          const response = await fetch(apiUrl("resources", { source, path: joinPath(path, file.name, false), override: "false" }), {
-            method: "POST", credentials: "same-origin", body: chunk,
-            headers: { "X-File-Chunk-Offset": String(offset), "X-File-Total-Size": String(file.size) },
-          });
-          if (!response.ok) throw new Error(response.status === 409 ? "同名文件已存在" : `${response.status} ${response.statusText}`);
-          offset += chunk.size;
-          const percent = file.size ? (offset / file.size) * 100 : 100;
-          transfer.update(percent, `${Math.min(100, Math.round(percent))}%`);
-          if (file.size === 0) break;
-        }
-        transfer.update(100, "已完成");
-      } catch (error) {
-        transfer.error("失败");
-        toast(`${file.name} 上传失败：${error.message}`, "error");
-      }
+  function normalizeRelativePath(value) {
+    const parts = String(value || "").replaceAll("\\", "/").split("/").filter((part) => part && part !== ".");
+    if (!parts.length || parts.some((part) => part === "..")) throw new Error("上传路径无效");
+    return parts.join("/");
+  }
+
+  function uploadRecords(files) {
+    return [...files].map((file) => ({
+      file,
+      relativePath: normalizeRelativePath(file.webkitRelativePath || file.name),
+    }));
+  }
+
+  function allParentDirectories(records, extraDirectories = []) {
+    const directories = new Set(extraDirectories.map(normalizeRelativePath));
+    records.forEach(({ relativePath }) => {
+      const parts = relativePath.split("/");
+      parts.pop();
+      let current = "";
+      parts.forEach((part) => {
+        current = current ? `${current}/${part}` : part;
+        directories.add(current);
+      });
+    });
+    return [...directories].sort((left, right) => left.split("/").length - right.split("/").length || left.localeCompare(right, "zh-CN"));
+  }
+
+  async function createUploadDirectory(source, basePath, relativePath) {
+    const response = await fetch(apiUrl("resources", {
+      source,
+      path: joinPath(basePath, relativePath, true),
+      override: "false",
+      isDir: "true",
+    }), { method: "POST", credentials: "same-origin", body: new Blob([]) });
+    if (response.redirected && new URL(response.url).pathname === "/login") {
+      location.href = `/login?next=${encodeURIComponent(location.pathname + location.hash)}`;
+      throw new Error("登录已过期");
     }
-    if (state.source === source && state.path === path) await openFolder(source, path, false);
-    loadCapacities();
+    if (!response.ok && response.status !== 409) throw new Error(`创建文件夹失败：${response.status} ${response.statusText}`);
+  }
+
+  async function uploadOneFile(record, source, basePath, transfer, overwrite) {
+    const { file, relativePath } = record;
+    let offset = 0;
+    while (offset < file.size || (file.size === 0 && offset === 0)) {
+      const chunk = file.slice(offset, Math.min(offset + CHUNK_SIZE, file.size));
+      const response = await fetch(apiUrl("resources", {
+        source,
+        path: joinPath(basePath, relativePath, false),
+        override: overwrite && offset === 0 ? "true" : "false",
+      }), {
+        method: "POST", credentials: "same-origin", body: chunk,
+        headers: { "X-File-Chunk-Offset": String(offset), "X-File-Total-Size": String(file.size) },
+      });
+      if (response.redirected && new URL(response.url).pathname === "/login") {
+        location.href = `/login?next=${encodeURIComponent(location.pathname + location.hash)}`;
+        throw new Error("登录已过期");
+      }
+      if (response.status === 409 && offset === 0 && !overwrite) return "conflict";
+      if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+      offset += chunk.size;
+      const percent = file.size ? (offset / file.size) * 100 : 100;
+      transfer.update(percent, `${Math.min(100, Math.round(percent))}%`);
+      if (file.size === 0) break;
+    }
+    transfer.update(100, "已完成");
+    return "uploaded";
+  }
+
+  async function uploadFiles(records, extraDirectories = []) {
+    if (state.view !== "files" || (!records.length && !extraDirectories.length)) return;
+    if (state.uploading) return toast("已有上传任务正在进行", "error");
+    state.uploading = true;
+    updateSelection();
+    elements.transferList.replaceChildren();
+    elements.transferPanel.hidden = false;
+    const source = state.source, path = state.path;
+    let overwriteExisting = null;
+    let uploaded = 0, skipped = 0, failed = 0;
+    try {
+      for (const directory of allParentDirectories(records, extraDirectories)) {
+        await createUploadDirectory(source, path, directory);
+      }
+      for (const record of records) {
+        const transfer = addTransfer(record.relativePath);
+        try {
+          let result = await uploadOneFile(record, source, path, transfer, false);
+          if (result === "conflict") {
+            if (overwriteExisting === null) {
+              overwriteExisting = await confirmAction(
+                "发现同名文件",
+                `“${record.relativePath}”已经存在。是否覆盖？本批次中其余同名文件将使用相同选择。`,
+                "覆盖",
+              );
+            }
+            if (!overwriteExisting) {
+              transfer.skip();
+              skipped += 1;
+              continue;
+            }
+            result = await uploadOneFile(record, source, path, transfer, true);
+          }
+          if (result === "uploaded") uploaded += 1;
+        } catch (error) {
+          failed += 1;
+          transfer.error(`失败：${error.message}`);
+          toast(`${record.relativePath} 上传失败：${error.message}`, "error");
+        }
+      }
+      if (!failed && !skipped) toast(`上传完成：${uploaded} 个文件`, "success");
+      else toast(`上传结束：成功 ${uploaded}，跳过 ${skipped}，失败 ${failed}`, failed ? "error" : "");
+    } catch (error) {
+      toast(`无法准备上传目录：${error.message}`, "error");
+    } finally {
+      state.uploading = false;
+      updateSelection();
+      if (state.source === source && state.path === path) await openFolder(source, path, false);
+      loadCapacities();
+    }
+  }
+
+  function readDirectoryEntries(reader) {
+    return new Promise((resolve, reject) => reader.readEntries(resolve, reject));
+  }
+
+  async function walkDroppedEntry(entry, parent, records, directories) {
+    const relativePath = normalizeRelativePath(parent ? `${parent}/${entry.name}` : entry.name);
+    if (entry.isFile) {
+      const file = await new Promise((resolve, reject) => entry.file(resolve, reject));
+      records.push({ file, relativePath });
+      return;
+    }
+    if (!entry.isDirectory) return;
+    directories.push(relativePath);
+    const reader = entry.createReader();
+    while (true) {
+      const batch = await readDirectoryEntries(reader);
+      if (!batch.length) break;
+      for (const child of batch) await walkDroppedEntry(child, relativePath, records, directories);
+    }
+  }
+
+  async function droppedUploadItems(dataTransfer) {
+    const entries = [...dataTransfer.items].map((item) => item.webkitGetAsEntry?.()).filter(Boolean);
+    if (!entries.length) return { records: uploadRecords(dataTransfer.files), directories: [] };
+    const records = [], directories = [];
+    for (const entry of entries) await walkDroppedEntry(entry, "", records, directories);
+    return { records, directories };
   }
 
   function bindEvents() {
@@ -440,7 +568,9 @@
     elements.refresh.addEventListener("click", () => openFolder(state.source, state.path, false));
     elements.newFolder.addEventListener("click", createFolder);
     elements.upload.addEventListener("click", () => elements.fileInput.click());
-    elements.fileInput.addEventListener("change", () => { uploadFiles([...elements.fileInput.files]); elements.fileInput.value = ""; });
+    elements.uploadFolder.addEventListener("click", () => elements.folderInput.click());
+    elements.fileInput.addEventListener("change", () => { uploadFiles(uploadRecords(elements.fileInput.files)); elements.fileInput.value = ""; });
+    elements.folderInput.addEventListener("change", () => { uploadFiles(uploadRecords(elements.folderInput.files)); elements.folderInput.value = ""; });
     elements.download.addEventListener("click", () => downloadEntry());
     elements.rename.addEventListener("click", renameSelected);
     elements.delete.addEventListener("click", deleteSelected);
@@ -454,7 +584,16 @@
     }));
     elements.dropZone.addEventListener("dragover", (event) => { event.preventDefault(); elements.dropZone.classList.add("dragging"); });
     elements.dropZone.addEventListener("dragleave", (event) => { if (!elements.dropZone.contains(event.relatedTarget)) elements.dropZone.classList.remove("dragging"); });
-    elements.dropZone.addEventListener("drop", (event) => { event.preventDefault(); elements.dropZone.classList.remove("dragging"); uploadFiles([...event.dataTransfer.files]); });
+    elements.dropZone.addEventListener("drop", async (event) => {
+      event.preventDefault();
+      elements.dropZone.classList.remove("dragging");
+      try {
+        const { records, directories } = await droppedUploadItems(event.dataTransfer);
+        uploadFiles(records, directories);
+      } catch (error) {
+        toast(`无法读取拖入的内容：${error.message}`, "error");
+      }
+    });
     elements.content.addEventListener("click", (event) => {
       if (state.view === "files" && !event.target.closest("tr") && !event.target.closest("button")) { state.selected = null; renderEntries(); updateSelection(); }
     });

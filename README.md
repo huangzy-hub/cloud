@@ -31,7 +31,7 @@ Browser -> HTTPS/Nginx -> FRP -> RK Nginx -> cloud-auth
 - 自定义单 Key 登录，支持创建、过期、撤销、轮换和全局会话失效。
 - Key 只保存 scrypt 散列，明文只在创建或轮换时显示一次。
 - FileBrowser Quantum 使用反向代理认证，无公开后台管理入口。
-- 自带仿 Windows 文件资源管理器网页和一致风格的 Key 登录页，支持地址栏、SSD 容量、详细列表与常用文件操作。
+- 自带仿 Windows 文件资源管理器网页和一致风格的 Key 登录页，支持地址栏、SSD 容量、详细列表、文件与文件夹上传、拖放上传、下载、新建文件夹、重命名和删除；上传时保留目录结构，并在遇到同名文件时询问是否覆盖。
 - systemd 自动启动和重连；可选 NetworkManager 网络看门狗。
 - 包含单元测试、HTTP 集成测试和公网 SSD CRUD 测试。
 
